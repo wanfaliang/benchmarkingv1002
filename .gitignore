@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+
+# Environment
+.env
+
+# Data (user-generated files)
+/data/*
+!/data/.gitkeep
+!/data/shared/.gitkeep
+!/data/analyses/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Frontend
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
