@@ -2,6 +2,7 @@
 
 import os
 import time
+from pathlib import Path
 from io import StringIO
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -96,9 +97,10 @@ class FREDCollector:
         retries: int = 3,
         backoff: float = 0.8,
         fmp_api_key: Optional[str] = None,
+        export_dir: Path = Path("economics")
     ):
         self.indicators = indicators.copy() if indicators else self.DEFAULT_INDICATORS.copy()
-        self.export_dir = self.EXPORT_FILE_DIR
+        self.export_dir = export_dir
         self.filename_base = self.FILENAME_BASE
         self.monthly_agg = monthly_agg
         self.quarterly_agg = quarterly_agg
@@ -546,7 +548,7 @@ class FREDCollector:
         """
         os.makedirs(self.export_dir, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M")
-        xlsx_path = os.path.join(self.export_dir, f"{self.filename_base}_{ts}.xlsx")
+        xlsx_path = os.path.join(str(self.export_dir), f"{self.filename_base}_{ts}.xlsx")
 
         raw_long  = self.build_raw_long()
         monthly   = self.build_monthly_panel()
@@ -582,6 +584,6 @@ class FREDCollector:
     def run_export_single(self) -> str:
         self.fetch_all()
         # QC is optional but recommended in normal runs
-        # self.qc_dedupe_series()
+        self.qc_dedupe_series()
         # self.print_coverage_summary(min_years=15)
         return self.export_single_workbook()

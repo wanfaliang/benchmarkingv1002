@@ -35,6 +35,6 @@ class FileService:
     
     def get_shared_economic_indicators_path(self) -> Path:
         """Get shared economic indicators file path"""
-        return self.data_dir / "shared" / "economic_indicators.xlsx"
+        return self.data_dir / "shared"
 
 file_service = FileService()

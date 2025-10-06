@@ -51,20 +51,13 @@ class DataCollectionService:
             # fred_data = fred_collector.collect_indicators()
             
             # Step 2: Collect financial data (FinancialDataCollection) 
-            print("✓ Collecting profiles...")
-            print("✓ Collecting statements/ratios/key-metrics...")
-            print("✓ Collecting enterprise values...")
-            print("✓ Collecting employee history...")
-            print("✓ Collecting prices...")
-            print("✓ Collecting insider trading...")
-            print("✓ Collecting institutional ownership...")
-            print("✓ Collecting analyst estimates...")
             
             financial_collector = FinancialDataCollection(
                  api_key=self.fmp_api_key,
                  companies=companies_dict,
                  years=analysis.years_back,
-                 export_dir=file_service.get_analysis_dir(analysis.analysis_id)
+                 export_dir=file_service.get_analysis_dir(analysis.analysis_id),
+                 econ_dir = file_service.get_shared_economic_indicators_path()
              )
             financial_data = financial_collector.get_all_financial_data(force_collect=True)
             raw_data_path = financial_collector.export_excel()

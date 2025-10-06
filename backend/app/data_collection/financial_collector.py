@@ -1,4 +1,4 @@
-# ======================= FinancialDataCollectionV3 (Enhanced with Institutional & Insider Activity + S&P 500) =======================
+# ======================= FinancialDataCollection (Enhanced with Institutional & Insider Activity + S&P 500) =======================
 import os
 import re
 from pathlib import Path
@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 import requests
 from .fred_collector import FREDCollector
-
 
 def _ensure_dir(p: str) -> None:
     os.makedirs(p, exist_ok=True)
@@ -86,6 +85,7 @@ class FinancialDataCollection:
         retries: int = 3,
         backoff: float = 0.7,
         export_dir: Path = Path("export"),
+        econ_dir: Path =Path("export")
     ):
         self.api_key = api_key
         self.companies = {k: (v or "").upper().strip() for k, v in companies.items()}
@@ -101,6 +101,7 @@ class FinancialDataCollection:
 
         self.export_dir = Path(export_dir)
         _ensure_dir(self.export_dir)
+        self.econ_dir = econ_dir
 
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "CollectorV3/1.3"})
@@ -831,7 +832,7 @@ class FinancialDataCollection:
 
         if use_fallback:
             print("ℹ️ No recent macro workbook found - running FREDCollector to build one...")
-            fc = FREDCollector(fmp_api_key=self.api_key)
+            fc = FREDCollector(fmp_api_key=self.api_key, export_dir = str(self.econ_dir))
             econ_path = fc.run_export_single()
         else:
             econ_path = latest
@@ -881,11 +882,11 @@ class FinancialDataCollection:
         cohort = "_".join(self.companies.keys())
         ts = datetime.now().strftime("%Y%m%d_%H%M")
         base = filename_base or f"All_Financial_Data_{cohort}"
-        path = self.export_dir / f"{base}_{ts}.xlsx"   # ← Path join
+        path = self.export_dir / "raw_data.xlsx"   # ← Path join
         _ensure_dir(self.export_dir)                   # ← Path ok
 
         try:
-            econ_ann = self.get_economic(force_refresh=False)
+            econ_ann = self.get_economic(force_refresh=False, econ_dir = str(self.econ_dir),)
         except Exception:
             econ_ann = pd.DataFrame()
 
