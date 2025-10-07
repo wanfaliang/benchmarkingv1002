@@ -36,5 +36,14 @@ class FileService:
     def get_shared_economic_indicators_path(self) -> Path:
         """Get shared economic indicators file path"""
         return self.data_dir / "shared"
+    
+    def get_collector_pickle_path(self, analysis_id: str) -> Path:
+        """Get path to the pickled FinancialDataCollection object."""
+        return self.get_analysis_dir(analysis_id) / "financial_collector.pkl"
+
+    def collector_pickle_exists(self, analysis_id: str) -> bool:
+        """Check if collector pickle file exists."""
+        return self.get_collector_pickle_path(analysis_id).exists()
+
 
 file_service = FileService()

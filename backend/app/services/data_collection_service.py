@@ -11,6 +11,7 @@ from ..config import settings
 # Import Version Zero classes (we'll need to adjust import paths)
 from ..data_collection.fred_collector import FREDCollector  
 from ..data_collection.financial_collector import FinancialDataCollection
+from .collector_loader_service import collector_loader_service
 
 class DataCollectionService:
     def __init__(self):
@@ -67,6 +68,15 @@ class DataCollectionService:
             print(f"✓ Saving data to {raw_data_path}")
             
             print("✓ Raw collection complete")
+
+            collector_path = collector_loader_service.save_financial_collector(
+            collector=financial_collector,
+            analysis_id=analysis.analysis_id
+            )
+            
+            collector_info = collector_loader_service.get_collector_info(analysis.analysis_id)
+            if collector_info:
+                print(f"Collector file size: {collector_info['size_mb']} MB")
             
             # Update analysis status
             analysis.status = "collection_complete"
