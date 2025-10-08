@@ -5,6 +5,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api import auth, tickers, analyses
 from .config import settings
 
+import logging
+import sys
+from pathlib import Path
+
+# Configure logging
+log_dir = Path("logs")
+log_dir.mkdir(exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_dir / "app.log"),
+        logging.StreamHandler(sys.stdout)  # Also print to console
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
 # Create FastAPI app
 app = FastAPI(
     title="Financial Analysis Platform",

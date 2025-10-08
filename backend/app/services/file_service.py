@@ -21,6 +21,13 @@ class FileService:
         """Get sections directory path"""
         return self.get_analysis_dir(analysis_id) / "sections"
     
+    def get_section_path(self, analysis_id: str, section_number: int, section_name: str) -> Path:
+        """Get the path for a specific section HTML file."""
+        sections_dir = self.get_sections_dir(analysis_id)
+        clean_name = section_name.lower().replace(" ", "_").replace("&", "and")
+        filename = f"section_{section_number:02d}_{clean_name}.html"
+        return sections_dir / filename
+    
     def create_analysis_dirs(self, analysis_id: str) -> None:
         """Create directory structure for analysis"""
         analysis_dir = self.get_analysis_dir(analysis_id)
