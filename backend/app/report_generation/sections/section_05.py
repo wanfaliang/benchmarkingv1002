@@ -24,17 +24,14 @@ from backend.app.report_generation.html_utils import (
     build_completeness_bar
 )
 
-
 def generate(collector, analysis_id: str) -> str:
     """
-    Generate Section 5: Liquidity, Solvency & Capital Structure Analysis
+    Generate Section 5 with Top 3 Priority Enhancements:
+    1. Key Takeaways Box
+    2. Section Navigation
+    3. Trend Indicators
     
-    Args:
-        collector: Loaded FinancialDataCollection object
-        analysis_id: The analysis ID
-    
-    Returns:
-        Complete HTML string
+    This replaces the original generate() function
     """
     
     # Extract data from collector
@@ -57,10 +54,31 @@ def generate(collector, analysis_id: str) -> str:
     except:
         economic_df = pd.DataFrame()
     
-    # Sector analysis placeholder (would come from Section 2 artifacts in production)
+    # Sector analysis placeholder
     sector_analysis = {'dominant_sector': 'Mixed'}
     
-    # Build all subsections
+    # Generate all analyses (needed for key takeaways)
+    liquidity_analysis = _analyze_enhanced_liquidity(df, companies, institutional_df, sector_analysis)
+    solvency_analysis = _analyze_advanced_solvency(df, companies, economic_df, sector_analysis)
+    capital_structure = _analyze_capital_structure_optimization(df, companies, economic_df, sector_analysis, institutional_df)
+    balance_sheet_quality = _analyze_balance_sheet_quality(df, companies, sector_analysis)
+    cash_flow_adequacy = _analyze_cash_flow_adequacy(df, companies, sector_analysis)
+    
+    # BUILD KEY TAKEAWAYS BOX (Enhancement #1)
+    key_takeaways_html = _build_key_takeaways(
+        liquidity_analysis, 
+        solvency_analysis, 
+        capital_structure, 
+        balance_sheet_quality, 
+        cash_flow_adequacy, 
+        df, 
+        len(companies)
+    )
+    
+    # BUILD SECTION NAVIGATION (Enhancement #2)
+    navigation_html = _build_section_navigation()
+    
+    # Build all subsections (reuse existing functions)
     section_5a_html = _build_section_5a_liquidity_analysis(
         df, companies, institutional_df, insider_df, sector_analysis
     )
@@ -85,9 +103,22 @@ def generate(collector, analysis_id: str) -> str:
         df, companies, sector_analysis, institutional_df, economic_df
     )
     
-    # Combine all subsections
+    # Add anchor IDs to each section for navigation
+    section_5a_html = f'<div id="section-5a">{section_5a_html}</div>'
+    section_5b_html = f'<div id="section-5b">{section_5b_html}</div>'
+    section_5c_html = f'<div id="section-5c">{section_5c_html}</div>'
+    section_5d_html = f'<div id="section-5d">{section_5d_html}</div>'
+    section_5e_html = f'<div id="section-5e">{section_5e_html}</div>'
+    section_5g_html = f'<div id="section-5g">{section_5g_html}</div>'
+    
+    # Combine all content with enhancements
     content = f"""
+    <div id="top"></div>
     <div class="section-content-wrapper">
+        {key_takeaways_html}
+        
+        {navigation_html}
+        
         {section_5a_html}
         {build_section_divider() if section_5b_html else ""}
         {section_5b_html}
@@ -103,6 +134,8 @@ def generate(collector, analysis_id: str) -> str:
     """
     
     return generate_section_wrapper(5, "Liquidity, Solvency & Capital Structure", content)
+
+
 
 
 # =============================================================================
@@ -3284,6 +3317,315 @@ def _build_success_metrics_targets(
             <div style="text-align: center; padding: 15px;">
                 <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">Stakeholder Reporting</div>
                 <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary-gradient-start);">✓</div>
+            </div>
+        </div>
+    </div>
+    """
+# =============================================================================
+# ENHANCEMENTS: TOP 3 PRIORITY FEATURES
+# =============================================================================
+
+# Add these functions to section_05.py
+
+def _get_trend_indicator(current_value: float, historical_values: List[float], 
+                        higher_is_better: bool = True) -> str:
+    """
+    Generate trend indicator with emoji and direction arrow
+    
+    Args:
+        current_value: Most recent value
+        historical_values: List of historical values (3-5 periods)
+        higher_is_better: True if higher values indicate improvement
+    
+    Returns:
+        HTML string with emoji and arrow (e.g., "🟢 ↑")
+    """
+    
+    if not historical_values or len(historical_values) < 2:
+        return '<span style="color: #94a3b8;">⚪ →</span>'  # Neutral - insufficient data
+    
+    historical_avg = np.mean(historical_values)
+    
+    # Calculate percentage change
+    if historical_avg != 0:
+        pct_change = ((current_value - historical_avg) / historical_avg) * 100
+    else:
+        pct_change = 0
+    
+    # Determine if improving or declining
+    is_improving = (pct_change > 10) if higher_is_better else (pct_change < -10)
+    is_declining = (pct_change < -10) if higher_is_better else (pct_change > 10)
+    
+    # Return appropriate indicator
+    if is_improving:
+        return '<span style="color: #10b981; font-weight: 600;">🟢 ↑</span>'
+    elif is_declining:
+        return '<span style="color: #ef4444; font-weight: 600;">🔴 ↓</span>'
+    else:
+        return '<span style="color: #3b82f6; font-weight: 600;">🔵 →</span>'
+
+
+def _build_section_navigation() -> str:
+    """Build sticky navigation menu for Section 5"""
+    
+    return """
+    <div id="section-nav" style="position: sticky; top: 20px; z-index: 100; 
+                background: var(--card-bg); backdrop-filter: blur(20px) saturate(180%);
+                padding: 15px 20px; border-radius: 16px; margin-bottom: 30px; 
+                box-shadow: var(--shadow-lg); border: 1px solid var(--card-border);
+                animation: slideIn 0.6s ease;">
+        <div style="display: flex; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 1.2rem; margin-right: 10px;">🧭</span>
+            <strong style="color: var(--text-primary); font-size: 1rem;">Section 5 Navigation</strong>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="#section-5a" style="padding: 8px 16px; border-radius: 8px; 
+                      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+                      color: var(--text-primary); text-decoration: none; font-size: 0.9rem; 
+                      font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.2);
+                      transition: all 0.3s ease; display: inline-block;"
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(16, 185, 129, 0.3)';"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                💧 5A: Liquidity
+            </a>
+            <a href="#section-5b" style="padding: 8px 16px; border-radius: 8px; 
+                      background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05));
+                      color: var(--text-primary); text-decoration: none; font-size: 0.9rem; 
+                      font-weight: 600; border: 1px solid rgba(59, 130, 246, 0.2);
+                      transition: all 0.3s ease; display: inline-block;"
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.3)';"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                🏦 5B: Solvency
+            </a>
+            <a href="#section-5c" style="padding: 8px 16px; border-radius: 8px; 
+                      background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(168, 85, 247, 0.05));
+                      color: var(--text-primary); text-decoration: none; font-size: 0.9rem; 
+                      font-weight: 600; border: 1px solid rgba(168, 85, 247, 0.2);
+                      transition: all 0.3s ease; display: inline-block;"
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(168, 85, 247, 0.3)';"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                ⚖️ 5C: Capital
+            </a>
+            <a href="#section-5d" style="padding: 8px 16px; border-radius: 8px; 
+                      background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.05));
+                      color: var(--text-primary); text-decoration: none; font-size: 0.9rem; 
+                      font-weight: 600; border: 1px solid rgba(245, 158, 11, 0.2);
+                      transition: all 0.3s ease; display: inline-block;"
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(245, 158, 11, 0.3)';"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                📋 5D: Balance Sheet
+            </a>
+            <a href="#section-5e" style="padding: 8px 16px; border-radius: 8px; 
+                      background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(236, 72, 153, 0.05));
+                      color: var(--text-primary); text-decoration: none; font-size: 0.9rem; 
+                      font-weight: 600; border: 1px solid rgba(236, 72, 153, 0.2);
+                      transition: all 0.3s ease; display: inline-block;"
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(236, 72, 153, 0.3)';"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                💰 5E: Cash Flow
+            </a>
+            <a href="#section-5g" style="padding: 8px 16px; border-radius: 8px; 
+                      background: linear-gradient(135deg, rgba(100, 116, 139, 0.1), rgba(100, 116, 139, 0.05));
+                      color: var(--text-primary); text-decoration: none; font-size: 0.9rem; 
+                      font-weight: 600; border: 1px solid rgba(100, 116, 139, 0.2);
+                      transition: all 0.3s ease; display: inline-block;"
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(100, 116, 139, 0.3)';"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                🎯 5G: Insights
+            </a>
+            <a href="#top" style="padding: 8px 16px; border-radius: 8px; 
+                      background: linear-gradient(135deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0.05));
+                      color: var(--text-primary); text-decoration: none; font-size: 0.9rem; 
+                      font-weight: 600; border: 1px solid rgba(148, 163, 184, 0.2);
+                      transition: all 0.3s ease; display: inline-block;"
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(148, 163, 184, 0.3)';"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                ⬆️ Top
+            </a>
+        </div>
+    </div>
+    """
+
+
+def _build_key_takeaways(
+    liquidity_analysis: Dict,
+    solvency_analysis: Dict,
+    capital_structure: Dict,
+    balance_sheet_quality: Dict,
+    cash_flow_adequacy: Dict,
+    df: pd.DataFrame,
+    total_companies: int
+) -> str:
+    """Build key takeaways summary box at the top of Section 5"""
+    
+    # Calculate overall portfolio health
+    avg_liquidity = np.mean([m['adjusted_liquidity_score'] for m in liquidity_analysis.values()]) if liquidity_analysis else 5
+    avg_solvency = np.mean([m['sustainability_score'] for m in solvency_analysis.values()]) if solvency_analysis else 5
+    avg_wacc = np.mean([m['wacc'] for m in capital_structure.values()]) if capital_structure else 10
+    avg_bs_quality = np.mean([m['overall_quality_score'] for m in balance_sheet_quality.values()]) if balance_sheet_quality else 5
+    avg_cf_adequacy = np.mean([m['adequacy_score'] for m in cash_flow_adequacy.values()]) if cash_flow_adequacy else 5
+    
+    portfolio_health = np.mean([avg_liquidity, avg_solvency, avg_bs_quality, avg_cf_adequacy])
+    
+    # Determine health rating
+    if portfolio_health >= 8:
+        health_rating = "Excellent"
+        health_icon = "🟢"
+    elif portfolio_health >= 6:
+        health_rating = "Good"
+        health_icon = "🔵"
+    elif portfolio_health >= 4:
+        health_rating = "Fair"
+        health_icon = "🟡"
+    else:
+        health_rating = "Needs Improvement"
+        health_icon = "🔴"
+    
+    # Identify best area (highest score)
+    areas = {
+        'Liquidity': avg_liquidity,
+        'Solvency': avg_solvency,
+        'Balance Sheet Quality': avg_bs_quality,
+        'Cash Flow Adequacy': avg_cf_adequacy,
+        'Capital Efficiency': 10 - (avg_wacc / 1.5) if avg_wacc > 0 else 5
+    }
+    best_area = max(areas.items(), key=lambda x: x[1])
+    
+    # Identify area needing attention (lowest score, excluding WACC which is inverted)
+    needs_attention_areas = {
+        'Liquidity': avg_liquidity,
+        'Solvency': avg_solvency,
+        'Balance Sheet Quality': avg_bs_quality,
+        'Cash Flow Adequacy': avg_cf_adequacy
+    }
+    needs_attention = min(needs_attention_areas.items(), key=lambda x: x[1])
+    
+    # Count investment grade
+    investment_grade = sum(1 for m in solvency_analysis.values() 
+                          if m['estimated_credit_rating'] in ['A or higher', 'BBB']) if solvency_analysis else 0
+    
+    # Calculate trend indicators for key metrics
+    liquidity_trend = ""
+    solvency_trend = ""
+    wacc_trend = ""
+    
+    if not df.empty:
+        # Get historical data for trend analysis
+        recent_years = df.groupby('Year').agg({
+            'currentRatio': 'mean',
+            'interestCoverageRatio': 'mean'
+        }).tail(5)
+        
+        if len(recent_years) >= 3:
+            liquidity_historical = recent_years['currentRatio'].head(3).tolist()
+            current_liquidity = recent_years['currentRatio'].iloc[-1]
+            liquidity_trend = _get_trend_indicator(current_liquidity, liquidity_historical, higher_is_better=True)
+            
+            solvency_historical = recent_years['interestCoverageRatio'].head(3).tolist()
+            current_solvency = recent_years['interestCoverageRatio'].iloc[-1]
+            solvency_trend = _get_trend_indicator(current_solvency, solvency_historical, higher_is_better=True)
+    
+    return f"""
+    <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(168, 85, 247, 0.1)); 
+               padding: 30px; border-radius: 20px; margin-bottom: 30px; 
+               border: 2px solid var(--primary-gradient-start);
+               box-shadow: 0 10px 40px rgba(59, 130, 246, 0.2);
+               animation: slideIn 0.6s ease;">
+        <div style="display: flex; align-items: center; margin-bottom: 20px;">
+            <span style="font-size: 2rem; margin-right: 15px;">🔑</span>
+            <h3 style="margin: 0; color: var(--text-primary); font-size: 1.5rem;">Key Takeaways - Section 5</h3>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+            
+            <!-- Portfolio Health -->
+            <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; 
+                       border-left: 4px solid var(--primary-gradient-start);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <strong style="color: var(--text-secondary); font-size: 0.9rem;">PORTFOLIO HEALTH</strong>
+                    <span style="font-size: 1.5rem;">{health_icon}</span>
+                </div>
+                <div style="font-size: 1.8rem; font-weight: 700; color: var(--text-primary); margin: 10px 0;">
+                    {health_rating}
+                </div>
+                <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                    Overall Score: {portfolio_health:.1f}/10
+                </div>
+            </div>
+            
+            <!-- Top Strength -->
+            <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; 
+                       border-left: 4px solid #10b981;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <strong style="color: var(--text-secondary); font-size: 0.9rem;">TOP STRENGTH</strong>
+                    <span style="font-size: 1.5rem;">💪</span>
+                </div>
+                <div style="font-size: 1.3rem; font-weight: 700; color: var(--text-primary); margin: 10px 0;">
+                    {best_area[0]}
+                </div>
+                <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                    Score: {best_area[1]:.1f}/10
+                </div>
+            </div>
+            
+            <!-- Priority Area -->
+            <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; 
+                       border-left: 4px solid #f59e0b;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <strong style="color: var(--text-secondary); font-size: 0.9rem;">PRIORITY AREA</strong>
+                    <span style="font-size: 1.5rem;">🎯</span>
+                </div>
+                <div style="font-size: 1.3rem; font-weight: 700; color: var(--text-primary); margin: 10px 0;">
+                    {needs_attention[0]}
+                </div>
+                <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                    Score: {needs_attention[1]:.1f}/10
+                </div>
+            </div>
+            
+            <!-- Investment Grade -->
+            <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; 
+                       border-left: 4px solid #3b82f6;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <strong style="color: var(--text-secondary); font-size: 0.9rem;">INVESTMENT GRADE</strong>
+                    <span style="font-size: 1.5rem;">⭐</span>
+                </div>
+                <div style="font-size: 1.8rem; font-weight: 700; color: var(--text-primary); margin: 10px 0;">
+                    {investment_grade}/{total_companies}
+                </div>
+                <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                    BBB or Higher
+                </div>
+            </div>
+            
+        </div>
+        
+        <!-- Trend Summary -->
+        <div style="margin-top: 20px; padding: 20px; background: rgba(255, 255, 255, 0.5); 
+                   border-radius: 12px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
+            <div style="flex: 1; min-width: 200px;">
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">
+                    <strong>Recent Trends:</strong>
+                </div>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    {f'<div style="display: flex; align-items: center; gap: 8px;"><span>Liquidity:</span>{liquidity_trend}</div>' if liquidity_trend else ''}
+                    {f'<div style="display: flex; align-items: center; gap: 8px;"><span>Solvency:</span>{solvency_trend}</div>' if solvency_trend else ''}
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span>WACC:</span>
+                        <span style="color: {'#10b981' if avg_wacc <= 9 else '#f59e0b' if avg_wacc <= 11 else '#ef4444'}; font-weight: 600;">
+                            {avg_wacc:.2f}%
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div style="flex: 0 0 auto;">
+                <a href="#section-5g" style="padding: 10px 20px; background: linear-gradient(135deg, var(--primary-gradient-start), var(--primary-gradient-end)); 
+                          color: white; text-decoration: none; border-radius: 8px; font-weight: 600;
+                          display: inline-block; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);"
+                   onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(102, 126, 234, 0.4)';"
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)';">
+                    View Strategic Insights →
+                </a>
             </div>
         </div>
     </div>
