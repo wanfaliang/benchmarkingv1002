@@ -748,7 +748,7 @@ class FinancialDataCollection:
         if present:
             out = out.sort_values(["Company", "Year"])
             for c in present:
-                out[f"{c}_YoY"] = out.groupby("Company")[c].diff()
+                out[f"{c}_YoY"] = out.groupby("Company")[c].pct_change().round(6)
 
         self.all_fin_df = out
         numeric_cols = out.select_dtypes(include=[np.number]).columns.tolist()
