@@ -2070,31 +2070,31 @@ def _build_section_10d_visualizations_complete(df: pd.DataFrame, economic_df: pd
     
     html += "<h4>Chart 2: Regime Performance Characteristics</h4>"
     html += "<p>Comparative analysis of performance metrics across identified regimes</p>"
-    html += _create_regime_performance_chart(regime_analysis, regime_characterization)
+    html += _create_regime_performance_chart_complete(regime_analysis, regime_characterization)
     
     html += build_section_divider()
     
     html += "<h4>Chart 3: Economic Scenario Framework</h4>"
     html += "<p>Three-scenario modeling with macro-economic assumptions and sensitivity analysis</p>"
-    html += _create_scenario_framework_chart(scenario_models)
+    html += _create_scenario_framework_chart_complete(scenario_models)
     
     html += build_section_divider()
     
     html += "<h4>Chart 4: Scenario Revenue Projections</h4>"
     html += "<p>Forecasted revenue growth under different economic scenarios with confidence intervals</p>"
-    html += _create_scenario_projections_chart(scenario_projections)
+    html += _create_scenario_projections_chart_complete(scenario_projections)
     
     html += build_section_divider()
     
     html += "<h4>Chart 5: Uncertainty Quantification Analysis</h4>"
     html += "<p>Forecast uncertainty assessment with risk levels and confidence intervals</p>"
-    html += _create_uncertainty_analysis_chart(uncertainty_analysis)
+    html += _create_uncertainty_analysis_chart_complete(uncertainty_analysis)
     
     html += build_section_divider()
     
     html += "<h4>Chart 6: Comprehensive Regimes & Scenarios Dashboard</h4>"
     html += "<p>Portfolio-level regime stability and scenario sensitivity analysis</p>"
-    html += _create_regimes_scenarios_dashboard(regime_analysis, scenario_projections, uncertainty_analysis)
+    html += _create_regimes_scenarios_dashboard_complete(regime_analysis, scenario_projections, uncertainty_analysis)
     
     html += """
         </div>
@@ -2411,3 +2411,831 @@ def _create_strategic_insights_cards(insights: Dict[str, str], regime_analysis: 
     """
     
     return html
+
+"""Section 10 - Missing 6 Charts to Complete All Subplots
+
+Add these functions to section_10.py and update the existing chart functions.
+ALL NumPy types converted to native Python for JSON serialization.
+"""
+
+import pandas as pd
+import numpy as np
+from typing import Dict, List, Optional, Any
+
+from backend.app.report_generation.html_utils import (
+    build_plotly_chart
+)
+
+
+# =============================================================================
+# UPDATED CHART 2: ADD MISSING STABILITY VS DURATION SCATTER
+# =============================================================================
+
+def _create_regime_performance_chart_complete(regime_analysis: Dict, 
+                                             regime_characterization: Dict) -> str:
+    """Create regime performance characteristics visualization - COMPLETE with 4 charts"""
+    
+    if not regime_analysis:
+        return ""
+    
+    charts_html = ""
+    
+    # Collect regime data
+    all_regimes = []
+    companies_list = []
+    for company_name, analysis in regime_analysis.items():
+        for regime_name, regime_info in analysis['regimes'].items():
+            all_regimes.append({
+                'company': company_name,
+                'avg_growth': float(regime_info['avg_growth']),
+                'volatility': float(regime_info['volatility']),
+                'duration': int(regime_info['duration']),
+                'stability_score': float(regime_info['stability_score'])
+            })
+            companies_list.append(company_name)
+    
+    if all_regimes:
+        # Chart 2.1: Growth vs Volatility Scatter
+        trace = {
+            'x': [r['volatility'] for r in all_regimes],
+            'y': [r['avg_growth'] for r in all_regimes],
+            'type': 'scatter',
+            'mode': 'markers',
+            'marker': {
+                'size': 12,
+                'color': [r['stability_score'] for r in all_regimes],
+                'colorscale': 'Viridis',
+                'showscale': True,
+                'colorbar': {'title': 'Stability Score'}
+            },
+            'text': companies_list,
+            'hovertemplate': '<b>%{text}</b><br>Growth: %{y:.1f}%<br>Volatility: %{x:.1f}%<extra></extra>'
+        }
+        
+        median_growth = float(np.median([r['avg_growth'] for r in all_regimes]))
+        median_volatility = float(np.median([r['volatility'] for r in all_regimes]))
+        max_volatility = float(max([r['volatility'] for r in all_regimes]))
+        min_growth = float(min([r['avg_growth'] for r in all_regimes]))
+        max_growth = float(max([r['avg_growth'] for r in all_regimes]))
+        
+        layout = {
+            'title': 'Regime Performance: Growth vs Volatility',
+            'xaxis': {'title': 'Revenue Growth Volatility (%)'},
+            'yaxis': {'title': 'Average Revenue Growth (%)'},
+            'shapes': [
+                {'type': 'line', 'x0': 0, 'x1': max_volatility, 
+                 'y0': median_growth, 'y1': median_growth, 
+                 'line': {'color': 'red', 'dash': 'dash', 'width': 2}},
+                {'type': 'line', 'x0': median_volatility, 'x1': median_volatility, 
+                 'y0': min_growth, 'y1': max_growth, 
+                 'line': {'color': 'red', 'dash': 'dash', 'width': 2}}
+            ]
+        }
+        
+        fig_data = {'data': [trace], 'layout': layout}
+        charts_html += build_plotly_chart(fig_data, div_id="regime-growth-volatility", height=500)
+    
+    # Chart 2.2: Regime Duration Distribution
+    durations = [r['duration'] for r in all_regimes]
+    
+    trace = {
+        'x': durations,
+        'type': 'histogram',
+        'nbinsx': 8,
+        'marker': {'color': '#667eea'}
+    }
+    
+    mean_duration = float(np.mean(durations))
+    
+    layout = {
+        'title': 'Regime Duration Distribution',
+        'xaxis': {'title': 'Regime Duration (Years)'},
+        'yaxis': {'title': 'Frequency'},
+        'shapes': [{
+            'type': 'line',
+            'x0': mean_duration,
+            'x1': mean_duration,
+            'y0': 0,
+            'y1': 1,
+            'yref': 'paper',
+            'line': {'color': 'red', 'dash': 'dash', 'width': 2}
+        }],
+        'annotations': [{
+            'x': mean_duration,
+            'y': 0.95,
+            'yref': 'paper',
+            'text': f'Avg: {mean_duration:.1f} years',
+            'showarrow': False,
+            'bgcolor': 'rgba(255, 255, 255, 0.8)'
+        }]
+    }
+    
+    fig_data = {'data': [trace], 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="regime-duration-distribution", height=400)
+    
+    # Chart 2.3: Stability vs Duration Scatter (MISSING - NOW ADDED)
+    durations_list = [r['duration'] for r in all_regimes]
+    stability_scores = [r['stability_score'] for r in all_regimes]
+    
+    trace = {
+        'x': durations_list,
+        'y': stability_scores,
+        'type': 'scatter',
+        'mode': 'markers',
+        'marker': {
+            'size': 12,
+            'color': [r['avg_growth'] for r in all_regimes],
+            'colorscale': 'RdYlGn',
+            'showscale': True,
+            'colorbar': {'title': 'Avg Growth (%)'}
+        },
+        'text': companies_list,
+        'hovertemplate': '<b>%{text}</b><br>Duration: %{x} years<br>Stability: %{y:.1f}<extra></extra>'
+    }
+    
+    layout = {
+        'title': 'Regime Stability vs Duration',
+        'xaxis': {'title': 'Regime Duration (Years)'},
+        'yaxis': {'title': 'Stability Score (0-10)'}
+    }
+    
+    fig_data = {'data': [trace], 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="regime-stability-duration", height=400)
+    
+    # Chart 2.4: Company Regime Summary
+    companies = list(regime_analysis.keys())
+    regime_counts = [int(regime_analysis[comp]['regime_count']) for comp in companies]
+    stability_avgs = [float(regime_analysis[comp]['regime_stability']) for comp in companies]
+    
+    trace1 = {
+        'x': companies,
+        'y': regime_counts,
+        'type': 'bar',
+        'name': 'Regime Count',
+        'marker': {'color': '#667eea'}
+    }
+    
+    trace2 = {
+        'x': companies,
+        'y': stability_avgs,
+        'type': 'bar',
+        'name': 'Avg Stability Score',
+        'marker': {'color': '#f093fb'},
+        'yaxis': 'y2'
+    }
+    
+    layout = {
+        'title': 'Portfolio Regime Summary',
+        'xaxis': {'title': 'Companies'},
+        'yaxis': {'title': 'Number of Regimes'},
+        'yaxis2': {
+            'title': 'Average Stability Score',
+            'overlaying': 'y',
+            'side': 'right'
+        },
+        'barmode': 'group'
+    }
+    
+    fig_data = {'data': [trace1, trace2], 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="regime-summary", height=400)
+    
+    return charts_html
+
+
+# =============================================================================
+# UPDATED CHART 3: ADD MISSING PRIMARY INDICATORS BAR CHART
+# =============================================================================
+
+def _create_scenario_framework_chart_complete(scenario_models: Dict) -> str:
+    """Create economic scenario framework visualization - COMPLETE with 4 charts"""
+    
+    if not scenario_models or '_framework' not in scenario_models:
+        return ""
+    
+    charts_html = ""
+    scenarios = scenario_models['_framework']['scenarios']
+    
+    # Chart 3.1: Scenario Assumptions Comparison
+    indicators = ['GDP', 'CPI_All_Items', 'Unemployment_Rate', 'Treasury_10Y', 'S&P_500_Index']
+    indicator_labels = ['GDP', 'CPI', 'Unemployment', '10Y Treasury', 'S&P 500']
+    
+    scenario_names = ['Soft Landing', 'Re-acceleration', 'Economic Shock']
+    scenario_keys = ['soft_landing', 're_acceleration', 'economic_shock']
+    colors = ['#667eea', '#10b981', '#ef4444']
+    
+    traces = []
+    for i, (scenario_key, scenario_name) in enumerate(zip(scenario_keys, scenario_names)):
+        values = [float(scenarios[scenario_key]['assumptions'].get(indicator, 0)) for indicator in indicators]
+        
+        trace = {
+            'x': indicator_labels,
+            'y': values,
+            'type': 'bar',
+            'name': scenario_name,
+            'marker': {'color': colors[i]}
+        }
+        traces.append(trace)
+    
+    layout = {
+        'title': 'Economic Scenario Assumptions',
+        'xaxis': {'title': 'Economic Indicators'},
+        'yaxis': {'title': 'Change from Baseline (%)'},
+        'barmode': 'group',
+        'shapes': [{
+            'type': 'line',
+            'x0': -0.5,
+            'x1': len(indicator_labels) - 0.5,
+            'y0': 0,
+            'y1': 0,
+            'line': {'color': 'black', 'width': 1}
+        }]
+    }
+    
+    fig_data = {'data': traces, 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="scenario-assumptions", height=500)
+    
+    # Chart 3.2: Model Quality Distribution
+    company_models = {k: v for k, v in scenario_models.items() if k != '_framework'}
+    
+    if company_models:
+        quality_counts = {'High': 0, 'Moderate': 0, 'Low': 0}
+        for model in company_models.values():
+            quality_counts[model['model_quality']] += 1
+        
+        trace = {
+            'labels': list(quality_counts.keys()),
+            'values': list(quality_counts.values()),
+            'type': 'pie',
+            'marker': {'colors': ['#10b981', '#f59e0b', '#ef4444']}
+        }
+        
+        layout = {
+            'title': 'Scenario Model Quality Distribution'
+        }
+        
+        fig_data = {'data': [trace], 'layout': layout}
+        charts_html += build_plotly_chart(fig_data, div_id="model-quality-pie", height=400)
+    
+    # Chart 3.3: Confidence vs Sensitivity
+    if company_models:
+        companies = list(company_models.keys())
+        confidence_levels = [float(model['confidence_level']) for model in company_models.values()]
+        sensitivity_ranges = [float(model['sensitivity_range']) for model in company_models.values()]
+        
+        trace = {
+            'x': confidence_levels,
+            'y': sensitivity_ranges,
+            'type': 'scatter',
+            'mode': 'markers+text',
+            'marker': {'size': 12, 'color': '#667eea'},
+            'text': [comp[:8] for comp in companies],
+            'textposition': 'top center',
+            'hovertemplate': '<b>%{text}</b><br>Confidence: %{x:.0f}%<br>Sensitivity: %{y:.1f}pp<extra></extra>'
+        }
+        
+        layout = {
+            'title': 'Model Confidence vs Scenario Sensitivity',
+            'xaxis': {'title': 'Model Confidence Level (%)'},
+            'yaxis': {'title': 'Scenario Sensitivity Range (pp)'}
+        }
+        
+        fig_data = {'data': [trace], 'layout': layout}
+        charts_html += build_plotly_chart(fig_data, div_id="confidence-sensitivity", height=400)
+    
+    # Chart 3.4: Primary Indicators Usage (MISSING - NOW ADDED)
+    if company_models:
+        indicator_counts = {}
+        for model in company_models.values():
+            indicator = model['primary_indicator']
+            indicator_counts[indicator] = indicator_counts.get(indicator, 0) + 1
+        
+        if indicator_counts:
+            indicators = list(indicator_counts.keys())
+            counts = list(indicator_counts.values())
+            
+            trace = {
+                'x': indicators,
+                'y': counts,
+                'type': 'bar',
+                'marker': {'color': '#667eea'},
+                'text': counts,
+                'textposition': 'outside'
+            }
+            
+            layout = {
+                'title': 'Most Used Predictive Indicators',
+                'xaxis': {'title': 'Primary Economic Indicators'},
+                'yaxis': {'title': 'Number of Companies'}
+            }
+            
+            fig_data = {'data': [trace], 'layout': layout}
+            charts_html += build_plotly_chart(fig_data, div_id="primary-indicators-usage", height=400)
+    
+    return charts_html
+
+
+# =============================================================================
+# UPDATED CHART 4: ADD MISSING SCENARIO RANGE ANALYSIS
+# =============================================================================
+
+def _create_scenario_projections_chart_complete(scenario_projections: Dict) -> str:
+    """Create scenario projections visualization - COMPLETE with 4 charts"""
+    
+    if not scenario_projections:
+        return ""
+    
+    charts_html = ""
+    companies = list(scenario_projections.keys())
+    
+    # Chart 4.1: Scenario Projections Comparison
+    baseline_vals = [float(proj['baseline_forecast']) for proj in scenario_projections.values()]
+    soft_landing_vals = [float(proj['soft_landing']) for proj in scenario_projections.values()]
+    re_accel_vals = [float(proj['re_acceleration']) for proj in scenario_projections.values()]
+    shock_vals = [float(proj['economic_shock']) for proj in scenario_projections.values()]
+    
+    traces = [
+        {
+            'x': companies,
+            'y': baseline_vals,
+            'type': 'bar',
+            'name': 'Baseline',
+            'marker': {'color': '#94a3b8'}
+        },
+        {
+            'x': companies,
+            'y': soft_landing_vals,
+            'type': 'bar',
+            'name': 'Soft Landing',
+            'marker': {'color': '#667eea'}
+        },
+        {
+            'x': companies,
+            'y': re_accel_vals,
+            'type': 'bar',
+            'name': 'Re-acceleration',
+            'marker': {'color': '#10b981'}
+        },
+        {
+            'x': companies,
+            'y': shock_vals,
+            'type': 'bar',
+            'name': 'Economic Shock',
+            'marker': {'color': '#ef4444'}
+        }
+    ]
+    
+    layout = {
+        'title': 'Scenario-Based Revenue Growth Projections',
+        'xaxis': {'title': 'Companies'},
+        'yaxis': {'title': 'Revenue Growth Forecast (%)'},
+        'barmode': 'group',
+        'shapes': [{
+            'type': 'line',
+            'x0': -0.5,
+            'x1': len(companies) - 0.5,
+            'y0': 0,
+            'y1': 0,
+            'line': {'color': 'black', 'width': 1}
+        }]
+    }
+    
+    fig_data = {'data': traces, 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="scenario-projections-comparison", height=500)
+    
+    # Chart 4.2: Upside vs Downside Analysis
+    upside_vals = [float(proj['upside_potential']) for proj in scenario_projections.values()]
+    downside_vals = [abs(float(proj['downside_risk'])) for proj in scenario_projections.values()]
+    
+    trace = {
+        'x': downside_vals,
+        'y': upside_vals,
+        'type': 'scatter',
+        'mode': 'markers+text',
+        'marker': {'size': 12, 'color': '#667eea'},
+        'text': [comp[:8] for comp in companies],
+        'textposition': 'top center',
+        'hovertemplate': '<b>%{text}</b><br>Downside: %{x:.1f}pp<br>Upside: %{y:.1f}pp<extra></extra>'
+    }
+    
+    max_val = float(max(max(upside_vals), max(downside_vals)))
+    
+    layout = {
+        'title': 'Risk-Return Profile Analysis',
+        'xaxis': {'title': 'Downside Risk (pp)'},
+        'yaxis': {'title': 'Upside Potential (pp)'},
+        'shapes': [{
+            'type': 'line',
+            'x0': 0,
+            'x1': max_val,
+            'y0': 0,
+            'y1': max_val,
+            'line': {'color': 'red', 'dash': 'dash', 'width': 2}
+        }],
+        'annotations': [{
+            'x': max_val * 0.5,
+            'y': max_val * 0.5,
+            'text': 'Equal Risk/Reward',
+            'showarrow': False,
+            'font': {'color': 'red'}
+        }]
+    }
+    
+    fig_data = {'data': [trace], 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="risk-return-scatter", height=500)
+    
+    # Chart 4.3: Scenario Range Analysis (MISSING - NOW ADDED)
+    scenario_ranges = [float(proj['sensitivity_range']) for proj in scenario_projections.values()]
+    confidence_levels = [float(proj['confidence_level']) for proj in scenario_projections.values()]
+    
+    trace = {
+        'x': companies,
+        'y': scenario_ranges,
+        'type': 'bar',
+        'marker': {'color': '#667eea'},
+        'text': [f"{conf:.0f}%" for conf in confidence_levels],
+        'textposition': 'outside',
+        'hovertemplate': '<b>%{x}</b><br>Sensitivity Range: %{y:.1f}pp<br>Confidence: %{text}<extra></extra>'
+    }
+    
+    layout = {
+        'title': 'Economic Scenario Sensitivity Analysis',
+        'xaxis': {'title': 'Companies'},
+        'yaxis': {'title': 'Scenario Sensitivity Range (pp)'}
+    }
+    
+    fig_data = {'data': [trace], 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="scenario-sensitivity-range", height=400)
+    
+    # Chart 4.4: Risk-Return Profile Distribution
+    risk_return_profiles = [proj['risk_return_profile'] for proj in scenario_projections.values()]
+    profile_counts = {'Favorable': 0, 'Balanced': 0, 'Defensive': 0}
+    
+    for profile in risk_return_profiles:
+        profile_counts[profile] += 1
+    
+    trace = {
+        'labels': list(profile_counts.keys()),
+        'values': list(profile_counts.values()),
+        'type': 'pie',
+        'marker': {'colors': ['#10b981', '#f59e0b', '#3b82f6']}
+    }
+    
+    layout = {
+        'title': 'Portfolio Risk-Return Profile Distribution'
+    }
+    
+    fig_data = {'data': [trace], 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="risk-return-pie", height=400)
+    
+    return charts_html
+
+
+# =============================================================================
+# UPDATED CHART 5: ADD MISSING UNCERTAINTY VS HISTORICAL VOLATILITY
+# =============================================================================
+
+def _create_uncertainty_analysis_chart_complete(uncertainty_analysis: Dict) -> str:
+    """Create uncertainty quantification analysis visualization - COMPLETE with 4 charts"""
+    
+    if not uncertainty_analysis:
+        return ""
+    
+    charts_html = ""
+    companies = list(uncertainty_analysis.keys())
+    
+    # Chart 5.1: Uncertainty Components Stacked
+    historical_vol = [float(analysis['historical_volatility']) for analysis in uncertainty_analysis.values()]
+    regime_instability = [float(10 - analysis['regime_stability']) for analysis in uncertainty_analysis.values()]
+    model_uncertainty = [float(analysis['model_uncertainty'] * 10) for analysis in uncertainty_analysis.values()]
+    scenario_dispersion = [float(analysis['scenario_dispersion']) for analysis in uncertainty_analysis.values()]
+    
+    traces = [
+        {
+            'x': companies,
+            'y': historical_vol,
+            'type': 'bar',
+            'name': 'Historical Volatility',
+            'marker': {'color': '#667eea'}
+        },
+        {
+            'x': companies,
+            'y': regime_instability,
+            'type': 'bar',
+            'name': 'Regime Instability',
+            'marker': {'color': '#10b981'}
+        },
+        {
+            'x': companies,
+            'y': model_uncertainty,
+            'type': 'bar',
+            'name': 'Model Uncertainty',
+            'marker': {'color': '#f59e0b'}
+        },
+        {
+            'x': companies,
+            'y': scenario_dispersion,
+            'type': 'bar',
+            'name': 'Scenario Dispersion',
+            'marker': {'color': '#ef4444'}
+        }
+    ]
+    
+    layout = {
+        'title': 'Forecast Uncertainty Component Analysis',
+        'xaxis': {'title': 'Companies'},
+        'yaxis': {'title': 'Uncertainty Components'},
+        'barmode': 'group'
+    }
+    
+    fig_data = {'data': traces, 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="uncertainty-components", height=500)
+    
+    # Chart 5.2: Overall Uncertainty Scores
+    uncertainty_scores = [float(analysis['uncertainty_score']) for analysis in uncertainty_analysis.values()]
+    risk_levels = [analysis['risk_level'] for analysis in uncertainty_analysis.values()]
+    
+    risk_colors_map = {'Low': '#10b981', 'Moderate': '#f59e0b', 'High': '#ef4444', 'Very High': '#7f1d1d'}
+    bar_colors = [risk_colors_map.get(risk, '#94a3b8') for risk in risk_levels]
+    
+    trace = {
+        'x': companies,
+        'y': uncertainty_scores,
+        'type': 'bar',
+        'marker': {'color': bar_colors},
+        'text': risk_levels,
+        'textposition': 'outside',
+        'hovertemplate': '<b>%{x}</b><br>Uncertainty: %{y:.1f}/10<br>Risk: %{text}<extra></extra>'
+    }
+    
+    layout = {
+        'title': 'Comprehensive Uncertainty Assessment',
+        'xaxis': {'title': 'Companies'},
+        'yaxis': {'title': 'Uncertainty Score (0-10)'}
+    }
+    
+    fig_data = {'data': [trace], 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="uncertainty-scores", height=400)
+    
+    # Chart 5.3: Risk Level Distribution
+    risk_counts = {'Low': 0, 'Moderate': 0, 'High': 0, 'Very High': 0}
+    for analysis in uncertainty_analysis.values():
+        risk_counts[analysis['risk_level']] += 1
+    
+    filtered_risk_counts = {k: v for k, v in risk_counts.items() if v > 0}
+    
+    if filtered_risk_counts:
+        trace = {
+            'labels': list(filtered_risk_counts.keys()),
+            'values': list(filtered_risk_counts.values()),
+            'type': 'pie',
+            'marker': {'colors': ['#10b981', '#f59e0b', '#ef4444', '#7f1d1d'][:len(filtered_risk_counts)]}
+        }
+        
+        layout = {
+            'title': 'Portfolio Risk Level Distribution'
+        }
+        
+        fig_data = {'data': [trace], 'layout': layout}
+        charts_html += build_plotly_chart(fig_data, div_id="risk-level-pie", height=400)
+    
+    # Chart 5.4: Uncertainty vs Historical Volatility Scatter (MISSING - NOW ADDED)
+    trace = {
+        'x': historical_vol,
+        'y': uncertainty_scores,
+        'type': 'scatter',
+        'mode': 'markers+text',
+        'marker': {
+            'size': 12,
+            'color': [float(analysis['regime_stability']) for analysis in uncertainty_analysis.values()],
+            'colorscale': 'RdYlGn',
+            'showscale': True,
+            'colorbar': {'title': 'Regime Stability'}
+        },
+        'text': [comp[:8] for comp in companies],
+        'textposition': 'top center',
+        'hovertemplate': '<b>%{text}</b><br>Historical Vol: %{x:.1f}%<br>Uncertainty: %{y:.1f}/10<extra></extra>'
+    }
+    
+    layout = {
+        'title': 'Uncertainty Score vs Historical Volatility',
+        'xaxis': {'title': 'Historical Volatility (%)'},
+        'yaxis': {'title': 'Uncertainty Score (0-10)'}
+    }
+    
+    fig_data = {'data': [trace], 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="uncertainty-volatility-scatter", height=400)
+    
+    return charts_html
+
+
+# =============================================================================
+# UPDATED CHART 6: ADD MISSING RISK-RETURN PIE AND UNCERTAINTY BARS
+# =============================================================================
+
+def _create_regimes_scenarios_dashboard_complete(regime_analysis: Dict, scenario_projections: Dict, 
+                                                uncertainty_analysis: Dict) -> str:
+    """Create comprehensive regimes & scenarios dashboard - COMPLETE with 5 charts"""
+    
+    charts_html = ""
+    
+    # Calculate portfolio-level metrics
+    if regime_analysis:
+        avg_regime_stability = float(np.mean([analysis['regime_stability'] for analysis in regime_analysis.values()]))
+    else:
+        avg_regime_stability = 5.0
+    
+    if scenario_projections:
+        avg_scenario_range = float(np.mean([proj['sensitivity_range'] for proj in scenario_projections.values()]))
+        avg_confidence = float(np.mean([proj['confidence_level'] for proj in scenario_projections.values()]))
+    else:
+        avg_scenario_range = 5.0
+        avg_confidence = 60.0
+    
+    if uncertainty_analysis:
+        avg_uncertainty = float(np.mean([analysis['uncertainty_score'] for analysis in uncertainty_analysis.values()]))
+    else:
+        avg_uncertainty = 5.0
+    
+    # Chart 6.1: Portfolio Summary Metrics
+    metrics = ['Regime\nStability', 'Scenario\nSensitivity', 'Model\nConfidence', 'Forecast\nUncertainty']
+    values = [
+        avg_regime_stability,
+        float(10 - avg_scenario_range),
+        float(avg_confidence / 10),
+        float(10 - avg_uncertainty)
+    ]
+    
+    trace = {
+        'x': metrics,
+        'y': values,
+        'type': 'bar',
+        'marker': {
+            'color': ['#ef4444', '#10b981', '#3b82f6', '#f59e0b'],
+            'line': {'color': '#1e293b', 'width': 2}
+        },
+        'text': [f'{v:.1f}' for v in values],
+        'textposition': 'outside'
+    }
+    
+    layout = {
+        'title': 'Portfolio Regimes & Scenarios Performance Dashboard',
+        'xaxis': {'title': ''},
+        'yaxis': {'title': 'Normalized Score (0-10)', 'range': [0, 12]}
+    }
+    
+    fig_data = {'data': [trace], 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="portfolio-summary-metrics", height=450)
+    
+    # Chart 6.2: Risk-Return Profile Mix Pie (MISSING - NOW ADDED)
+    if scenario_projections:
+        risk_return_profiles = [proj['risk_return_profile'] for proj in scenario_projections.values()]
+        profile_counts = {'Favorable': 0, 'Balanced': 0, 'Defensive': 0}
+        
+        for profile in risk_return_profiles:
+            profile_counts[profile] += 1
+        
+        if sum(profile_counts.values()) > 0:
+            trace = {
+                'labels': list(profile_counts.keys()),
+                'values': list(profile_counts.values()),
+                'type': 'pie',
+                'marker': {'colors': ['#10b981', '#f59e0b', '#3b82f6']}
+            }
+            
+            layout = {
+                'title': 'Risk-Return Profile Mix'
+            }
+            
+            fig_data = {'data': [trace], 'layout': layout}
+            charts_html += build_plotly_chart(fig_data, div_id="dashboard-risk-return-pie", height=400)
+    
+    # Chart 6.3: Scenario Projections Comparison (Line Chart)
+    if scenario_projections:
+        companies = list(scenario_projections.keys())
+        baseline_vals = [float(proj['baseline_forecast']) for proj in scenario_projections.values()]
+        soft_landing_vals = [float(proj['soft_landing']) for proj in scenario_projections.values()]
+        re_accel_vals = [float(proj['re_acceleration']) for proj in scenario_projections.values()]
+        shock_vals = [float(proj['economic_shock']) for proj in scenario_projections.values()]
+        
+        traces = [
+            {
+                'x': companies,
+                'y': baseline_vals,
+                'type': 'scatter',
+                'mode': 'lines+markers',
+                'name': 'Baseline',
+                'line': {'color': '#94a3b8', 'width': 3},
+                'marker': {'size': 8}
+            },
+            {
+                'x': companies,
+                'y': soft_landing_vals,
+                'type': 'scatter',
+                'mode': 'lines+markers',
+                'name': 'Soft Landing',
+                'line': {'color': '#667eea', 'width': 3},
+                'marker': {'size': 8, 'symbol': 'square'}
+            },
+            {
+                'x': companies,
+                'y': re_accel_vals,
+                'type': 'scatter',
+                'mode': 'lines+markers',
+                'name': 'Re-acceleration',
+                'line': {'color': '#10b981', 'width': 3},
+                'marker': {'size': 8, 'symbol': 'triangle-up'}
+            },
+            {
+                'x': companies,
+                'y': shock_vals,
+                'type': 'scatter',
+                'mode': 'lines+markers',
+                'name': 'Economic Shock',
+                'line': {'color': '#ef4444', 'width': 3},
+                'marker': {'size': 8, 'symbol': 'triangle-down'}
+            }
+        ]
+        
+        layout = {
+            'title': 'Portfolio Scenario Projections Comparison',
+            'xaxis': {'title': 'Companies'},
+            'yaxis': {'title': 'Revenue Growth Forecast (%)'},
+            'shapes': [{
+                'type': 'line',
+                'x0': -0.5,
+                'x1': len(companies) - 0.5,
+                'y0': 0,
+                'y1': 0,
+                'line': {'color': 'black', 'width': 1, 'dash': 'dash'}
+            }]
+        }
+        
+        fig_data = {'data': traces, 'layout': layout}
+        charts_html += build_plotly_chart(fig_data, div_id="scenario-projections-lines", height=500)
+    
+    # Chart 6.4: Uncertainty Assessment Bar Chart (MISSING - NOW ADDED)
+    if uncertainty_analysis:
+        companies = list(uncertainty_analysis.keys())
+        uncertainty_scores = [float(analysis['uncertainty_score']) for analysis in uncertainty_analysis.values()]
+        risk_levels = [analysis['risk_level'] for analysis in uncertainty_analysis.values()]
+        
+        risk_colors_map = {'Low': '#10b981', 'Moderate': '#f59e0b', 'High': '#ef4444', 'Very High': '#7f1d1d'}
+        bar_colors = [risk_colors_map.get(risk, '#94a3b8') for risk in risk_levels]
+        
+        trace = {
+            'x': companies,
+            'y': uncertainty_scores,
+            'type': 'bar',
+            'marker': {'color': bar_colors},
+            'text': risk_levels,
+            'textposition': 'outside'
+        }
+        
+        layout = {
+            'title': 'Forecast Uncertainty Assessment',
+            'xaxis': {'title': 'Companies'},
+            'yaxis': {'title': 'Uncertainty Score (0-10)'}
+        }
+        
+        fig_data = {'data': [trace], 'layout': layout}
+        charts_html += build_plotly_chart(fig_data, div_id="dashboard-uncertainty-bars", height=400)
+    
+    # Chart 6.5: Portfolio Intelligence Score Gauge
+    intelligence_components = [
+        avg_regime_stability / 10,
+        avg_confidence / 100,
+        (10 - avg_uncertainty) / 10,
+        (10 - avg_scenario_range) / 10
+    ]
+    
+    portfolio_intelligence_score = float(np.mean(intelligence_components) * 10)
+    
+    trace = {
+        'type': 'indicator',
+        'mode': 'gauge+number',
+        'value': portfolio_intelligence_score,
+        'title': {'text': 'Portfolio Intelligence Score'},
+        'gauge': {
+            'axis': {'range': [0, 10]},
+            'bar': {'color': '#667eea'},
+            'steps': [
+                {'range': [0, 4], 'color': '#fee2e2'},
+                {'range': [4, 7], 'color': '#fef3c7'},
+                {'range': [7, 10], 'color': '#d1fae5'}
+            ],
+            'threshold': {
+                'line': {'color': 'red', 'width': 4},
+                'thickness': 0.75,
+                'value': 7
+            }
+        }
+    }
+    
+    layout = {
+        'title': 'Comprehensive Portfolio Intelligence Assessment'
+    }
+    
+    fig_data = {'data': [trace], 'layout': layout}
+    charts_html += build_plotly_chart(fig_data, div_id="portfolio-intelligence-gauge", height=400)
+    
+    return charts_html

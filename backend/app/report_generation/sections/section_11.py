@@ -2102,15 +2102,22 @@ def _generate_predictive_risk_summary(predictive_risk: Dict, avg_early_warning: 
     )
 
 
-def _build_section_11e_visualizations(df: pd.DataFrame, companies: Dict[str, str], analysis_id) -> str:
-    """Build subsection 11E: Risk & Alert Visualization Dashboard"""
+"""
+Section 11 - Complete Chart Functions
+Replace the chart functions in _build_section_11e_visualizations with these.
+This creates ALL individual charts that Version Zero had, but as standalone Plotly charts.
+"""
+
+
+
+def _build_section_11e_visualizations(df, companies, analysis_id):
+    """Build subsection 11E with ALL individual charts"""
     
     # Generate all required data
     risk_analysis = _generate_comprehensive_risk_analysis(df, companies)
     alert_system = _generate_automated_alerts(df, companies, risk_analysis)
     risk_scoring = _generate_risk_scoring_system(risk_analysis, alert_system, companies)
     
-    # Get economic data if available
     try:
         from backend.app.report_generation.section_runner import get_collector_for_analysis
         collector = get_collector_for_analysis(analysis_id)
@@ -2127,56 +2134,147 @@ def _build_section_11e_visualizations(df: pd.DataFrame, companies: Dict[str, str
             '<div class="info-box warning"><p>Insufficient data for visualization dashboard.</p></div>'
         )
     
-    # Build all 6 charts
-    chart1_html = _create_risk_metrics_heatmap(risk_analysis, companies)
-    chart2_html = _create_alert_system_dashboard(alert_system, companies)
-    chart3_html = _create_risk_scoring_distribution(risk_scoring)
-    chart4_html = _create_predictive_risk_models_chart(predictive_risk)
-    chart5_html = _create_risk_correlation_matrix(risk_analysis, companies)
-    chart6_html = _create_comprehensive_risk_dashboard(risk_analysis, alert_system, risk_scoring, predictive_risk)
+    # Create ALL individual charts
+    chart1 = _create_chart_1_risk_metrics_heatmap(risk_analysis, companies)
+    chart2 = _create_chart_2_alert_distribution_by_company(alert_system, companies)
+    chart3 = _create_chart_3_alert_priority_scores(alert_system, companies)
+    chart4 = _create_chart_4_alert_frequency_distribution(alert_system)
+    chart5 = _create_chart_5_risk_trend_direction(alert_system)
+    chart6 = _create_chart_6_composite_risk_scores(risk_scoring)
+    chart7 = _create_chart_7_risk_component_breakdown(risk_scoring)
+    chart8 = _create_chart_8_risk_rating_distribution(risk_scoring)
+    chart9 = _create_chart_9_risk_trend_classification(risk_scoring)
+    chart10 = _create_chart_10_early_warning_scores(predictive_risk)
+    chart11 = _create_chart_11_risk_trajectory_predictions(predictive_risk)
+    chart12 = _create_chart_12_predicted_risk_level_distribution(predictive_risk)
+    chart13 = _create_chart_13_confidence_vs_early_warning(predictive_risk)
+    chart14 = _create_chart_14_risk_correlation_matrix(risk_analysis, companies)
+    chart15 = _create_chart_15_portfolio_risk_summary(risk_analysis, alert_system, risk_scoring)
+    chart16 = _create_chart_16_alert_severity_pie(alert_system)
+    chart17 = _create_chart_17_portfolio_risk_distribution(risk_scoring)
+    chart18 = _create_chart_18_predictive_risk_bars(predictive_risk)
+    chart19 = _create_chart_19_portfolio_risk_intelligence_gauge(risk_analysis, alert_system, risk_scoring, predictive_risk)
     
     subsection_content = f"""
     <h3>Comprehensive Risk & Alert Visualization Suite</h3>
     
     <p style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 30px;">
-        Interactive dashboards providing multi-dimensional risk assessment, alert classification, 
-        predictive modeling insights, and portfolio-wide risk intelligence through advanced visualizations.
+        Complete visualization dashboard with 19 individual interactive charts providing multi-dimensional 
+        risk assessment, alert classification, predictive modeling insights, and portfolio-wide risk intelligence.
     </p>
     
     <div class="info-section">
         <h4>Chart 1: Risk Metrics Heat Map</h4>
-        <p style="color: var(--text-secondary);">Multi-dimensional risk assessment across all monitored financial and operational metrics</p>
-        {chart1_html}
+        <p style="color: var(--text-secondary);">Multi-dimensional risk assessment across financial, operational, liquidity, market, and overall risk dimensions</p>
+        {chart1}
     </div>
     
     <div class="info-section">
-        <h4>Chart 2: Alert System Dashboard</h4>
-        <p style="color: var(--text-secondary);">Real-time alert classification by severity with frequency patterns and priority distribution</p>
-        {chart2_html}
+        <h4>Chart 2: Alert Distribution by Company</h4>
+        <p style="color: var(--text-secondary);">Stacked bar chart showing critical, warning, and monitoring alerts by company</p>
+        {chart2}
     </div>
     
     <div class="info-section">
-        <h4>Chart 3: Risk Scoring Distribution</h4>
-        <p style="color: var(--text-secondary);">Portfolio-wide risk score distribution with composite ratings and component analysis</p>
-        {chart3_html}
+        <h4>Chart 3: Alert Priority Scores</h4>
+        <p style="color: var(--text-secondary);">Priority score assessment for each company (0-100 scale)</p>
+        {chart3}
     </div>
     
     <div class="info-section">
-        <h4>Chart 4: Predictive Risk Models</h4>
-        <p style="color: var(--text-secondary);">Forward-looking risk trajectory analysis with early warning indicators and confidence metrics</p>
-        {chart4_html}
+        <h4>Chart 4: Alert Frequency Distribution</h4>
+        <p style="color: var(--text-secondary);">Portfolio-wide alert frequency classification (High/Moderate/Low)</p>
+        {chart4}
     </div>
     
     <div class="info-section">
-        <h4>Chart 5: Risk Correlation Matrix</h4>
-        <p style="color: var(--text-secondary);">Inter-metric risk correlation analysis for comprehensive portfolio risk understanding</p>
-        {chart5_html}
+        <h4>Chart 5: Risk Trend Direction</h4>
+        <p style="color: var(--text-secondary);">Portfolio risk direction trends (Increasing/Stable/Decreasing)</p>
+        {chart5}
     </div>
     
     <div class="info-section">
-        <h4>Chart 6: Comprehensive Risk Management Dashboard</h4>
-        <p style="color: var(--text-secondary);">Executive-level risk overview integrating all risk dimensions with strategic insights</p>
-        {chart6_html}
+        <h4>Chart 6: Composite Risk Scores with Thresholds</h4>
+        <p style="color: var(--text-secondary);">Company-level composite risk scores with low/moderate/high risk threshold lines</p>
+        {chart6}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 7: Risk Component Score Breakdown</h4>
+        <p style="color: var(--text-secondary);">Grouped bar chart showing financial, operational, liquidity, and market risk components</p>
+        {chart7}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 8: Risk Rating Distribution</h4>
+        <p style="color: var(--text-secondary);">Portfolio distribution across risk rating categories</p>
+        {chart8}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 9: Risk Trend Classification</h4>
+        <p style="color: var(--text-secondary);">Distribution of risk trend directions across portfolio</p>
+        {chart9}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 10: Early Warning Scores by Company</h4>
+        <p style="color: var(--text-secondary);">Predictive early warning scores with confidence level annotations</p>
+        {chart10}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 11: Risk Trajectory Predictions</h4>
+        <p style="color: var(--text-secondary);">Portfolio distribution of predicted risk trajectories</p>
+        {chart11}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 12: Predicted Risk Level Distribution</h4>
+        <p style="color: var(--text-secondary);">Forward-looking risk level distribution across portfolio</p>
+        {chart12}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 13: Confidence vs Early Warning Scatter</h4>
+        <p style="color: var(--text-secondary);">Prediction confidence plotted against early warning scores</p>
+        {chart13}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 14: Risk Correlation Matrix</h4>
+        <p style="color: var(--text-secondary);">Inter-metric risk correlation analysis</p>
+        {chart14}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 15: Portfolio Risk Summary Metrics</h4>
+        <p style="color: var(--text-secondary);">Key portfolio-level risk metrics summary</p>
+        {chart15}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 16: Alert Severity Distribution</h4>
+        <p style="color: var(--text-secondary);">Portfolio-wide alert severity breakdown</p>
+        {chart16}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 17: Portfolio Risk Distribution with Zones</h4>
+        <p style="color: var(--text-secondary);">Company risk scores with visual threshold zones</p>
+        {chart17}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 18: Predictive Risk Analysis by Company</h4>
+        <p style="color: var(--text-secondary);">Early warning scores colored by risk trajectory</p>
+        {chart18}
+    </div>
+    
+    <div class="info-section">
+        <h4>Chart 19: Portfolio Risk Intelligence Score</h4>
+        <p style="color: var(--text-secondary);">Composite portfolio risk intelligence gauge visualization</p>
+        {chart19}
     </div>
     """
     
@@ -2185,6 +2283,873 @@ def _build_section_11e_visualizations(df: pd.DataFrame, companies: Dict[str, str
         "Risk & Alert Visualization Dashboard",
         subsection_content
     )
+
+
+# =============================================================================
+# CHART 1: RISK METRICS HEAT MAP
+# =============================================================================
+
+def _create_chart_1_risk_metrics_heatmap(risk_analysis: Dict, companies: Dict[str, str]) -> str:
+    """Chart 1: Risk metrics heatmap"""
+    
+    company_names = list(risk_analysis.keys())
+    risk_categories = ['Financial Risk', 'Operational Risk', 'Liquidity Risk', 'Market Risk', 'Overall Risk']
+    
+    # Prepare data
+    heatmap_data = []
+    for company in company_names:
+        risk_data = risk_analysis[company]
+        row = [
+            _calculate_financial_risk_score(risk_data.get('financial_risks', {})),
+            _calculate_operational_risk_score(risk_data.get('operational_risks', {})),
+            _calculate_liquidity_risk_score(risk_data.get('liquidity_risks', {})),
+            _calculate_market_risk_score(risk_data.get('market_risks', {})),
+            risk_data.get('overall_risk_score', 5)
+        ]
+        heatmap_data.append(row)
+    
+    # Transpose for proper orientation
+    heatmap_array = np.array(heatmap_data).T.tolist()
+    
+    fig_data = {
+        'data': [{
+            'type': 'heatmap',
+            'z': heatmap_array,
+            'x': [comp[:15] for comp in company_names],
+            'y': risk_categories,
+            'colorscale': [
+                [0, '#10b981'],
+                [0.3, '#3b82f6'],
+                [0.5, '#f59e0b'],
+                [0.7, '#ef4444'],
+                [1, '#dc2626']
+            ],
+            'zmin': 0,
+            'zmax': 10,
+            'colorbar': {'title': 'Risk Score', 'titleside': 'right'},
+            'hovertemplate': '<b>%{y}</b><br>%{x}<br>Score: %{z:.1f}/10<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Portfolio Risk Metrics Heat Map',
+            'xaxis': {'title': 'Companies', 'tickangle': -45},
+            'yaxis': {'title': 'Risk Dimensions'},
+            'height': 500
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-1-heatmap", height=500)
+
+
+# =============================================================================
+# CHART 2: ALERT DISTRIBUTION BY COMPANY (STACKED BAR)
+# =============================================================================
+
+def _create_chart_2_alert_distribution_by_company(alert_system: Dict, companies: Dict[str, str]) -> str:
+    """Chart 2: Alert distribution by company - stacked bars"""
+    
+    company_names = list(alert_system.keys())
+    critical_alerts = [alert_system[comp]['alert_summary']['critical_count'] for comp in company_names]
+    warning_alerts = [alert_system[comp]['alert_summary']['warning_count'] for comp in company_names]
+    monitoring_alerts = [alert_system[comp]['alert_summary']['monitoring_count'] for comp in company_names]
+    
+    fig_data = {
+        'data': [
+            {
+                'type': 'bar',
+                'name': 'Critical',
+                'x': [comp[:12] for comp in company_names],
+                'y': critical_alerts,
+                'marker': {'color': '#ef4444'},
+                'hovertemplate': '<b>%{x}</b><br>Critical: %{y}<extra></extra>'
+            },
+            {
+                'type': 'bar',
+                'name': 'Warning',
+                'x': [comp[:12] for comp in company_names],
+                'y': warning_alerts,
+                'marker': {'color': '#f59e0b'},
+                'hovertemplate': '<b>%{x}</b><br>Warning: %{y}<extra></extra>'
+            },
+            {
+                'type': 'bar',
+                'name': 'Monitoring',
+                'x': [comp[:12] for comp in company_names],
+                'y': monitoring_alerts,
+                'marker': {'color': '#3b82f6'},
+                'hovertemplate': '<b>%{x}</b><br>Monitoring: %{y}<extra></extra>'
+            }
+        ],
+        'layout': {
+            'title': 'Alert Distribution by Company',
+            'xaxis': {'title': 'Companies', 'tickangle': -45},
+            'yaxis': {'title': 'Alert Count'},
+            'barmode': 'stack',
+            'height': 500,
+            'showlegend': True,
+            'legend': {'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02, 'xanchor': 'right', 'x': 1}
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-2-alert-dist", height=500)
+
+
+# =============================================================================
+# CHART 3: ALERT PRIORITY SCORES
+# =============================================================================
+
+def _create_chart_3_alert_priority_scores(alert_system: Dict, companies: Dict[str, str]) -> str:
+    """Chart 3: Alert priority scores by company"""
+    
+    company_names = list(alert_system.keys())
+    priority_scores = [alert_system[comp]['alert_summary']['priority_score'] for comp in company_names]
+    
+    fig_data = {
+        'data': [{
+            'type': 'bar',
+            'x': [comp[:12] for comp in company_names],
+            'y': priority_scores,
+            'marker': {
+                'color': priority_scores,
+                'colorscale': [
+                    [0, '#10b981'],
+                    [0.5, '#f59e0b'],
+                    [1, '#ef4444']
+                ],
+                'cmin': 0,
+                'cmax': 100,
+                'colorbar': {'title': 'Priority'}
+            },
+            'text': [f'{score:.0f}' for score in priority_scores],
+            'textposition': 'outside',
+            'hovertemplate': '<b>%{x}</b><br>Priority: %{y:.0f}/100<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Alert Priority Score Assessment',
+            'xaxis': {'title': 'Companies', 'tickangle': -45},
+            'yaxis': {'title': 'Priority Score (0-100)'},
+            'height': 450
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-3-priority", height=450)
+
+
+# =============================================================================
+# CHART 4: ALERT FREQUENCY DISTRIBUTION (PIE)
+# =============================================================================
+
+def _create_chart_4_alert_frequency_distribution(alert_system: Dict) -> str:
+    """Chart 4: Alert frequency distribution pie chart"""
+    
+    frequency_counts = {'High Frequency': 0, 'Moderate Frequency': 0, 'Low Frequency': 0}
+    for alerts in alert_system.values():
+        freq = alerts['alert_summary']['alert_frequency']
+        frequency_counts[freq] += 1
+    
+    fig_data = {
+        'data': [{
+            'type': 'pie',
+            'labels': list(frequency_counts.keys()),
+            'values': list(frequency_counts.values()),
+            'marker': {'colors': ['#ef4444', '#f59e0b', '#10b981']},
+            'hovertemplate': '<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Alert Frequency Distribution',
+            'height': 400,
+            'showlegend': True
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-4-freq-pie", height=400)
+
+
+# =============================================================================
+# CHART 5: RISK TREND DIRECTION (PIE)
+# =============================================================================
+
+def _create_chart_5_risk_trend_direction(alert_system: Dict) -> str:
+    """Chart 5: Portfolio risk trend direction pie chart"""
+    
+    trend_counts = {'Increasing': 0, 'Stable': 0, 'Decreasing': 0}
+    for alerts in alert_system.values():
+        if 'alert_trends' in alerts:
+            trend = alerts['alert_trends'].get('risk_direction', 'Stable')
+            trend_counts[trend] = trend_counts.get(trend, 0) + 1
+    
+    fig_data = {
+        'data': [{
+            'type': 'pie',
+            'labels': list(trend_counts.keys()),
+            'values': list(trend_counts.values()),
+            'marker': {'colors': ['#ef4444', '#3b82f6', '#10b981']},
+            'hovertemplate': '<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Portfolio Risk Trend Direction',
+            'height': 400,
+            'showlegend': True
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-5-trend-pie", height=400)
+
+
+# =============================================================================
+# CHART 6: COMPOSITE RISK SCORES WITH THRESHOLDS
+# =============================================================================
+
+def _create_chart_6_composite_risk_scores(risk_scoring: Dict) -> str:
+    """Chart 6: Composite risk scores with threshold lines"""
+    
+    company_names = list(risk_scoring.keys())
+    composite_scores = [risk_scoring[comp]['composite_risk_score'] for comp in company_names]
+    
+    fig_data = {
+        'data': [{
+            'type': 'bar',
+            'x': [comp[:12] for comp in company_names],
+            'y': composite_scores,
+            'marker': {
+                'color': ['#10b981' if s <= 3 else '#3b82f6' if s <= 5 else '#f59e0b' if s <= 7 else '#ef4444' 
+                         for s in composite_scores]
+            },
+            'hovertemplate': '<b>%{x}</b><br>Risk Score: %{y:.1f}/10<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Composite Risk Score Distribution',
+            'xaxis': {'title': 'Companies', 'tickangle': -45},
+            'yaxis': {'title': 'Composite Risk Score (0-10)'},
+            'height': 500,
+            'shapes': [
+                {
+                    'type': 'line',
+                    'x0': -0.5,
+                    'x1': len(company_names) - 0.5,
+                    'y0': 3,
+                    'y1': 3,
+                    'line': {'color': '#10b981', 'width': 2, 'dash': 'dash'}
+                },
+                {
+                    'type': 'line',
+                    'x0': -0.5,
+                    'x1': len(company_names) - 0.5,
+                    'y0': 5,
+                    'y1': 5,
+                    'line': {'color': '#f59e0b', 'width': 2, 'dash': 'dash'}
+                },
+                {
+                    'type': 'line',
+                    'x0': -0.5,
+                    'x1': len(company_names) - 0.5,
+                    'y0': 7,
+                    'y1': 7,
+                    'line': {'color': '#ef4444', 'width': 2, 'dash': 'dash'}
+                }
+            ],
+            'annotations': [
+                {'x': len(company_names) - 0.7, 'y': 3.2, 'text': 'Low Risk', 'showarrow': False, 'font': {'size': 10, 'color': '#10b981'}},
+                {'x': len(company_names) - 0.7, 'y': 5.2, 'text': 'Moderate', 'showarrow': False, 'font': {'size': 10, 'color': '#f59e0b'}},
+                {'x': len(company_names) - 0.7, 'y': 7.2, 'text': 'High Risk', 'showarrow': False, 'font': {'size': 10, 'color': '#ef4444'}}
+            ]
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-6-composite", height=500)
+
+
+# =============================================================================
+# CHART 7: RISK COMPONENT BREAKDOWN (GROUPED BARS)
+# =============================================================================
+
+def _create_chart_7_risk_component_breakdown(risk_scoring: Dict) -> str:
+    """Chart 7: Risk component score breakdown - grouped bars"""
+    
+    company_names = list(risk_scoring.keys())
+    financial_scores = [risk_scoring[comp]['financial_risk_score'] for comp in company_names]
+    operational_scores = [risk_scoring[comp]['operational_risk_score'] for comp in company_names]
+    liquidity_scores = [risk_scoring[comp]['liquidity_risk_score'] for comp in company_names]
+    market_scores = [risk_scoring[comp]['market_risk_score'] for comp in company_names]
+    
+    fig_data = {
+        'data': [
+            {
+                'type': 'bar',
+                'name': 'Financial',
+                'x': [comp[:12] for comp in company_names],
+                'y': financial_scores,
+                'marker': {'color': '#667eea'},
+                'hovertemplate': '<b>%{x}</b><br>Financial: %{y:.1f}<extra></extra>'
+            },
+            {
+                'type': 'bar',
+                'name': 'Operational',
+                'x': [comp[:12] for comp in company_names],
+                'y': operational_scores,
+                'marker': {'color': '#764ba2'},
+                'hovertemplate': '<b>%{x}</b><br>Operational: %{y:.1f}<extra></extra>'
+            },
+            {
+                'type': 'bar',
+                'name': 'Liquidity',
+                'x': [comp[:12] for comp in company_names],
+                'y': liquidity_scores,
+                'marker': {'color': '#f093fb'},
+                'hovertemplate': '<b>%{x}</b><br>Liquidity: %{y:.1f}<extra></extra>'
+            },
+            {
+                'type': 'bar',
+                'name': 'Market',
+                'x': [comp[:12] for comp in company_names],
+                'y': market_scores,
+                'marker': {'color': '#10b981'},
+                'hovertemplate': '<b>%{x}</b><br>Market: %{y:.1f}<extra></extra>'
+            }
+        ],
+        'layout': {
+            'title': 'Risk Component Score Breakdown',
+            'xaxis': {'title': 'Companies', 'tickangle': -45},
+            'yaxis': {'title': 'Risk Score (0-10)'},
+            'barmode': 'group',
+            'height': 450,
+            'showlegend': True,
+            'legend': {'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02, 'xanchor': 'right', 'x': 1}
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-7-components", height=450)
+
+
+# =============================================================================
+# CHART 8: RISK RATING DISTRIBUTION (PIE)
+# =============================================================================
+
+def _create_chart_8_risk_rating_distribution(risk_scoring: Dict) -> str:
+    """Chart 8: Risk rating distribution pie chart"""
+    
+    rating_counts = {}
+    for scoring in risk_scoring.values():
+        rating = scoring['risk_rating']
+        rating_counts[rating] = rating_counts.get(rating, 0) + 1
+    
+    # Colors for risk ratings
+    rating_colors_map = {
+        'Low Risk': '#10b981',
+        'Moderate Risk': '#3b82f6',
+        'High Risk': '#f59e0b',
+        'Critical Risk': '#ef4444',
+        'Extreme Risk': '#dc2626'
+    }
+    
+    labels = list(rating_counts.keys())
+    values = list(rating_counts.values())
+    colors = [rating_colors_map.get(label, '#667eea') for label in labels]
+    
+    fig_data = {
+        'data': [{
+            'type': 'pie',
+            'labels': labels,
+            'values': values,
+            'marker': {'colors': colors},
+            'hovertemplate': '<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Portfolio Risk Rating Distribution',
+            'height': 400,
+            'showlegend': True
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-8-rating-pie", height=400)
+
+
+# =============================================================================
+# CHART 9: RISK TREND CLASSIFICATION (PIE)
+# =============================================================================
+
+def _create_chart_9_risk_trend_classification(risk_scoring: Dict) -> str:
+    """Chart 9: Risk trend classification pie chart"""
+    
+    trend_counts = {}
+    for scoring in risk_scoring.values():
+        trend = scoring['risk_trend']
+        trend_counts[trend] = trend_counts.get(trend, 0) + 1
+    
+    # Colors for trends
+    trend_colors_map = {
+        'Rapidly Improving': '#10b981',
+        'Improving': '#3b82f6',
+        'Stable': '#f59e0b',
+        'Deteriorating': '#ef4444',
+        'Rapidly Deteriorating': '#dc2626'
+    }
+    
+    labels = list(trend_counts.keys())
+    values = list(trend_counts.values())
+    colors = [trend_colors_map.get(label, '#667eea') for label in labels]
+    
+    fig_data = {
+        'data': [{
+            'type': 'pie',
+            'labels': labels,
+            'values': values,
+            'marker': {'colors': colors},
+            'hovertemplate': '<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Portfolio Risk Trend Classification',
+            'height': 400,
+            'showlegend': True
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-9-trend-class-pie", height=400)
+
+
+# =============================================================================
+# CHART 10: EARLY WARNING SCORES
+# =============================================================================
+
+def _create_chart_10_early_warning_scores(predictive_risk: Dict) -> str:
+    """Chart 10: Early warning scores with confidence annotations"""
+    
+    company_names = list(predictive_risk.keys())
+    early_warning_scores = [predictive_risk[comp]['early_warning_score'] for comp in company_names]
+    confidence_levels = [predictive_risk[comp]['confidence_level'] for comp in company_names]
+    
+    # Color by trajectory
+    trajectory_colors = []
+    for comp in company_names:
+        trajectory = predictive_risk[comp]['risk_trajectory']
+        if trajectory == 'Deteriorating':
+            trajectory_colors.append('#ef4444')
+        elif trajectory == 'Improving':
+            trajectory_colors.append('#10b981')
+        else:
+            trajectory_colors.append('#3b82f6')
+    
+    fig_data = {
+        'data': [{
+            'type': 'bar',
+            'x': [comp[:12] for comp in company_names],
+            'y': early_warning_scores,
+            'marker': {'color': trajectory_colors},
+            'text': [f'{conf:.0f}%' for conf in confidence_levels],
+            'textposition': 'outside',
+            'hovertemplate': '<b>%{x}</b><br>Early Warning: %{y:.1f}/10<br>Confidence: %{text}<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Predictive Early Warning Scores',
+            'xaxis': {'title': 'Companies', 'tickangle': -45},
+            'yaxis': {'title': 'Early Warning Score (0-10)'},
+            'height': 500,
+            'annotations': [
+                {'x': 0.02, 'y': 0.98, 'xref': 'paper', 'yref': 'paper', 
+                 'text': '🔴 Deteriorating  🔵 Stable  🟢 Improving', 
+                 'showarrow': False, 'font': {'size': 11}, 'align': 'left'}
+            ]
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-10-early-warning", height=500)
+
+
+# =============================================================================
+# CHART 11: RISK TRAJECTORY PREDICTIONS (PIE)
+# =============================================================================
+
+def _create_chart_11_risk_trajectory_predictions(predictive_risk: Dict) -> str:
+    """Chart 11: Risk trajectory predictions pie chart"""
+    
+    trajectory_counts = {}
+    for pred in predictive_risk.values():
+        trajectory = pred['risk_trajectory']
+        trajectory_counts[trajectory] = trajectory_counts.get(trajectory, 0) + 1
+    
+    fig_data = {
+        'data': [{
+            'type': 'pie',
+            'labels': list(trajectory_counts.keys()),
+            'values': list(trajectory_counts.values()),
+            'marker': {'colors': ['#ef4444', '#3b82f6', '#10b981']},
+            'hovertemplate': '<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Risk Trajectory Predictions',
+            'height': 400,
+            'showlegend': True
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-11-trajectory-pie", height=400)
+
+
+# =============================================================================
+# CHART 12: PREDICTED RISK LEVEL DISTRIBUTION (PIE)
+# =============================================================================
+
+def _create_chart_12_predicted_risk_level_distribution(predictive_risk: Dict) -> str:
+    """Chart 12: Predicted risk level distribution pie chart"""
+    
+    risk_level_counts = {}
+    for pred in predictive_risk.values():
+        level = pred['predicted_risk_level']
+        risk_level_counts[level] = risk_level_counts.get(level, 0) + 1
+    
+    # Colors for risk levels
+    level_colors_map = {
+        'Low Risk': '#10b981',
+        'Low-Moderate Risk': '#3b82f6',
+        'Moderate Risk': '#f59e0b',
+        'High Risk': '#ef4444',
+        'Critical Risk': '#dc2626'
+    }
+    
+    labels = list(risk_level_counts.keys())
+    values = list(risk_level_counts.values())
+    colors = [level_colors_map.get(label, '#667eea') for label in labels]
+    
+    fig_data = {
+        'data': [{
+            'type': 'pie',
+            'labels': labels,
+            'values': values,
+            'marker': {'colors': colors},
+            'hovertemplate': '<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Predicted Risk Level Distribution',
+            'height': 400,
+            'showlegend': True
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-12-predicted-pie", height=400)
+
+
+# =============================================================================
+# CHART 13: CONFIDENCE VS EARLY WARNING SCATTER
+# =============================================================================
+
+def _create_chart_13_confidence_vs_early_warning(predictive_risk: Dict) -> str:
+    """Chart 13: Confidence vs early warning scatter plot"""
+    
+    company_names = list(predictive_risk.keys())
+    confidence_levels = [predictive_risk[comp]['confidence_level'] for comp in company_names]
+    early_warning_scores = [predictive_risk[comp]['early_warning_score'] for comp in company_names]
+    
+    # Color by trajectory
+    trajectory_colors = []
+    for comp in company_names:
+        trajectory = predictive_risk[comp]['risk_trajectory']
+        if trajectory == 'Deteriorating':
+            trajectory_colors.append('#ef4444')
+        elif trajectory == 'Improving':
+            trajectory_colors.append('#10b981')
+        else:
+            trajectory_colors.append('#3b82f6')
+    
+    fig_data = {
+        'data': [{
+            'type': 'scatter',
+            'mode': 'markers+text',
+            'x': confidence_levels,
+            'y': early_warning_scores,
+            'marker': {
+                'size': 15,
+                'color': trajectory_colors,
+                'line': {'width': 2, 'color': 'white'}
+            },
+            'text': [comp[:8] for comp in company_names],
+            'textposition': 'top center',
+            'textfont': {'size': 9},
+            'hovertemplate': '<b>%{text}</b><br>Confidence: %{x:.0f}%<br>Warning: %{y:.1f}<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Prediction Confidence vs Early Warning Score',
+            'xaxis': {'title': 'Prediction Confidence (%)', 'range': [45, 100]},
+            'yaxis': {'title': 'Early Warning Score (0-10)', 'range': [-0.5, 10.5]},
+            'height': 450
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-13-scatter", height=450)
+
+
+# =============================================================================
+# CHART 14: RISK CORRELATION MATRIX
+# =============================================================================
+
+def _create_chart_14_risk_correlation_matrix(risk_analysis: Dict, companies: Dict[str, str]) -> str:
+    """Chart 14: Risk correlation matrix heatmap"""
+    
+    if len(risk_analysis) < 2:
+        return '<div class="info-box warning"><p>Insufficient companies for correlation analysis.</p></div>'
+    
+    company_names = list(risk_analysis.keys())
+    risk_scores = []
+    for company in company_names:
+        scores = [
+            risk_analysis[company].get('overall_risk_score', 5),
+            _calculate_financial_risk_score(risk_analysis[company].get('financial_risks', {})),
+            _calculate_operational_risk_score(risk_analysis[company].get('operational_risks', {})),
+            _calculate_liquidity_risk_score(risk_analysis[company].get('liquidity_risks', {})),
+            _calculate_market_risk_score(risk_analysis[company].get('market_risks', {}))
+        ]
+        risk_scores.append(scores)
+    
+    # Calculate correlation matrix
+    risk_array = np.array(risk_scores)
+    correlation_matrix = np.corrcoef(risk_array.T)
+    
+    labels = ['Overall', 'Financial', 'Operational', 'Liquidity', 'Market']
+    
+    fig_data = {
+        'data': [{
+            'type': 'heatmap',
+            'z': correlation_matrix.tolist(),
+            'x': labels,
+            'y': labels,
+            'colorscale': 'RdBu',
+            'zmid': 0,
+            'zmin': -1,
+            'zmax': 1,
+            'colorbar': {'title': 'Correlation', 'titleside': 'right'},
+            'text': [[f'{val:.2f}' for val in row] for row in correlation_matrix],
+            'texttemplate': '%{text}',
+            'textfont': {'size': 12},
+            'hovertemplate': '<b>%{y} vs %{x}</b><br>Correlation: %{z:.3f}<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Risk Metrics Correlation Matrix',
+            'xaxis': {'title': ''},
+            'yaxis': {'title': ''},
+            'height': 500,
+            'width': 550
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-14-correlation", height=500)
+
+
+# =============================================================================
+# CHART 15: PORTFOLIO RISK SUMMARY (BAR)
+# =============================================================================
+
+def _create_chart_15_portfolio_risk_summary(risk_analysis: Dict, alert_system: Dict, 
+                                           risk_scoring: Dict) -> str:
+    """Chart 15: Portfolio risk summary metrics bar chart"""
+    
+    company_names = list(risk_scoring.keys())
+    
+    avg_composite = np.mean([risk_scoring[comp]['composite_risk_score'] for comp in company_names])
+    avg_financial = np.mean([risk_scoring[comp]['financial_risk_score'] for comp in company_names])
+    avg_operational = np.mean([risk_scoring[comp]['operational_risk_score'] for comp in company_names])
+    avg_liquidity = np.mean([risk_scoring[comp]['liquidity_risk_score'] for comp in company_names])
+    avg_alert = np.mean([alert_system[comp]['alert_summary']['total_alerts'] for comp in company_names])
+    
+    fig_data = {
+        'data': [{
+            'type': 'bar',
+            'x': ['Composite<br>Risk', 'Financial<br>Risk', 'Operational<br>Risk', 'Liquidity<br>Risk', 'Alert<br>Activity'],
+            'y': [avg_composite, avg_financial, avg_operational, avg_liquidity, avg_alert],
+            'marker': {
+                'color': ['#ef4444', '#667eea', '#764ba2', '#f093fb', '#f59e0b']
+            },
+            'text': [f'{val:.1f}' for val in [avg_composite, avg_financial, avg_operational, avg_liquidity, avg_alert]],
+            'textposition': 'outside',
+            'hovertemplate': '<b>%{x}</b><br>Score: %{y:.1f}<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Portfolio Risk Management Dashboard - Key Metrics',
+            'yaxis': {'title': 'Risk Score / Alert Count'},
+            'height': 400,
+            'showlegend': False
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-15-summary", height=400)
+
+
+# =============================================================================
+# CHART 16: ALERT SEVERITY DISTRIBUTION (PIE)
+# =============================================================================
+
+def _create_chart_16_alert_severity_pie(alert_system: Dict) -> str:
+    """Chart 16: Alert severity distribution pie chart"""
+    
+    company_names = list(alert_system.keys())
+    total_critical = sum(alert_system[comp]['alert_summary']['critical_count'] for comp in company_names)
+    total_warning = sum(alert_system[comp]['alert_summary']['warning_count'] for comp in company_names)
+    total_monitoring = sum(alert_system[comp]['alert_summary']['monitoring_count'] for comp in company_names)
+    
+    if total_critical + total_warning + total_monitoring == 0:
+        return '<div class="info-box success"><p>No alerts detected across portfolio.</p></div>'
+    
+    fig_data = {
+        'data': [{
+            'type': 'pie',
+            'labels': ['Critical', 'Warning', 'Monitoring'],
+            'values': [total_critical, total_warning, total_monitoring],
+            'marker': {'colors': ['#ef4444', '#f59e0b', '#3b82f6']},
+            'hovertemplate': '<b>%{label}</b><br>Count: %{value}<br>%{percent}<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Portfolio Alert Severity Distribution',
+            'height': 350,
+            'showlegend': True
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-16-severity-pie", height=350)
+
+
+# =============================================================================
+# CHART 17: PORTFOLIO RISK DISTRIBUTION WITH ZONES
+# =============================================================================
+
+def _create_chart_17_portfolio_risk_distribution(risk_scoring: Dict) -> str:
+    """Chart 17: Portfolio risk distribution with threshold zones"""
+    
+    company_names = list(risk_scoring.keys())
+    composite_scores = [risk_scoring[comp]['composite_risk_score'] for comp in company_names]
+    
+    fig_data = {
+        'data': [{
+            'type': 'bar',
+            'x': [comp[:10] for comp in company_names],
+            'y': composite_scores,
+            'marker': {
+                'color': ['#10b981' if s <= 3 else '#3b82f6' if s <= 5 else '#f59e0b' if s <= 7 else '#ef4444' 
+                         for s in composite_scores]
+            },
+            'hovertemplate': '<b>%{x}</b><br>Risk: %{y:.1f}/10<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Portfolio Composite Risk Distribution with Threshold Zones',
+            'xaxis': {'title': 'Companies', 'tickangle': -45},
+            'yaxis': {'title': 'Composite Risk Score (0-10)'},
+            'height': 400,
+            'shapes': [
+                {'type': 'rect', 'x0': -0.5, 'x1': len(company_names)-0.5, 'y0': 0, 'y1': 3,
+                 'fillcolor': '#10b981', 'opacity': 0.1, 'line': {'width': 0}},
+                {'type': 'rect', 'x0': -0.5, 'x1': len(company_names)-0.5, 'y0': 3, 'y1': 5,
+                 'fillcolor': '#3b82f6', 'opacity': 0.1, 'line': {'width': 0}},
+                {'type': 'rect', 'x0': -0.5, 'x1': len(company_names)-0.5, 'y0': 5, 'y1': 7,
+                 'fillcolor': '#f59e0b', 'opacity': 0.1, 'line': {'width': 0}},
+                {'type': 'rect', 'x0': -0.5, 'x1': len(company_names)-0.5, 'y0': 7, 'y1': 10,
+                 'fillcolor': '#ef4444', 'opacity': 0.1, 'line': {'width': 0}}
+            ]
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-17-zones", height=400)
+
+
+# =============================================================================
+# CHART 18: PREDICTIVE RISK BARS BY TRAJECTORY
+# =============================================================================
+
+def _create_chart_18_predictive_risk_bars(predictive_risk: Dict) -> str:
+    """Chart 18: Predictive risk analysis bars colored by trajectory"""
+    
+    company_names = list(predictive_risk.keys())
+    early_warning_scores = [predictive_risk[comp]['early_warning_score'] for comp in company_names]
+    
+    # Color by trajectory
+    trajectory_colors = []
+    for comp in company_names:
+        trajectory = predictive_risk[comp]['risk_trajectory']
+        if trajectory == 'Deteriorating':
+            trajectory_colors.append('#ef4444')
+        elif trajectory == 'Improving':
+            trajectory_colors.append('#10b981')
+        else:
+            trajectory_colors.append('#3b82f6')
+    
+    fig_data = {
+        'data': [{
+            'type': 'bar',
+            'x': [comp[:10] for comp in company_names],
+            'y': early_warning_scores,
+            'marker': {'color': trajectory_colors},
+            'hovertemplate': '<b>%{x}</b><br>Early Warning: %{y:.1f}/10<extra></extra>'
+        }],
+        'layout': {
+            'title': 'Predictive Risk Assessment & Trajectory Analysis',
+            'xaxis': {'title': 'Companies', 'tickangle': -45},
+            'yaxis': {'title': 'Early Warning Score (0-10)'},
+            'height': 400,
+            'annotations': [
+                {'x': 0.02, 'y': 0.98, 'xref': 'paper', 'yref': 'paper',
+                 'text': '🔴 Deteriorating  🔵 Stable  🟢 Improving',
+                 'showarrow': False, 'font': {'size': 11}, 'align': 'left'}
+            ]
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-18-predictive-bars", height=400)
+
+
+# =============================================================================
+# CHART 19: PORTFOLIO RISK INTELLIGENCE GAUGE
+# =============================================================================
+
+def _create_chart_19_portfolio_risk_intelligence_gauge(risk_analysis: Dict, alert_system: Dict,
+                                                       risk_scoring: Dict, predictive_risk: Dict) -> str:
+    """Chart 19: Portfolio risk intelligence gauge visualization"""
+    
+    # Calculate portfolio intelligence score
+    intelligence_components = []
+    
+    if risk_scoring:
+        avg_risk_score = np.mean([scoring['composite_risk_score'] for scoring in risk_scoring.values()])
+        intelligence_components.append((10 - avg_risk_score) / 10)
+    
+    if alert_system:
+        total_critical = sum(alerts['alert_summary']['critical_count'] for alerts in alert_system.values())
+        alert_efficiency = 1 - (total_critical / len(alert_system)) if alert_system else 1
+        intelligence_components.append(alert_efficiency)
+    
+    if predictive_risk:
+        avg_confidence = np.mean([pred['confidence_level'] for pred in predictive_risk.values()])
+        intelligence_components.append(avg_confidence / 100)
+    
+    portfolio_intelligence_score = np.mean(intelligence_components) * 10 if intelligence_components else 5
+    
+    # Create gauge chart
+    fig_data = {
+        'data': [{
+            'type': 'indicator',
+            'mode': 'gauge+number',
+            'value': portfolio_intelligence_score,
+            'title': {'text': 'Portfolio Risk Intelligence Score'},
+            'gauge': {
+                'axis': {'range': [0, 10]},
+                'bar': {'color': '#667eea'},
+                'steps': [
+                    {'range': [0, 3], 'color': '#ef4444'},
+                    {'range': [3, 5], 'color': '#f59e0b'},
+                    {'range': [5, 7], 'color': '#3b82f6'},
+                    {'range': [7, 10], 'color': '#10b981'}
+                ],
+                'threshold': {
+                    'line': {'color': 'red', 'width': 4},
+                    'thickness': 0.75,
+                    'value': 7
+                }
+            }
+        }],
+        'layout': {
+            'height': 400
+        }
+    }
+    
+    return build_plotly_chart(fig_data, div_id="chart-19-gauge", height=400)
+
+
+# Note: Helper functions like _calculate_financial_risk_score, etc. 
+# should already exist in your main file from previous steps.
 
 
 def _create_risk_metrics_heatmap(risk_analysis: Dict, companies: Dict[str, str]) -> str:
