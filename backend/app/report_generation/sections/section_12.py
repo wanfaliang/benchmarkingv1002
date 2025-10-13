@@ -3635,7 +3635,7 @@ def _generate_comprehensive_peer_analysis(df: pd.DataFrame, companies: Dict[str,
     
     peer_analysis = {}
     
-    print(f"\n=== Peer Analysis: Using Most Recent Year Per Company ===")
+    
     
     for company_name in companies.keys():
         company_all_data = df[df['Company'] == company_name]
@@ -3647,7 +3647,7 @@ def _generate_comprehensive_peer_analysis(df: pd.DataFrame, companies: Dict[str,
         latest_year_for_company = company_all_data['Year'].max()
         company_data = company_all_data[company_all_data['Year'] == latest_year_for_company]
         
-        print(f"  {company_name}: Using FY {latest_year_for_company}")
+        
         
         financial_metrics = _extract_financial_metrics(company_data)
         operational_metrics = _extract_operational_metrics(company_data)
@@ -3664,9 +3664,7 @@ def _generate_comprehensive_peer_analysis(df: pd.DataFrame, companies: Dict[str,
             'fiscal_year': latest_year_for_company
         }
     
-    print(f"Successfully processed: {len(peer_analysis)}/{len(companies)} companies")
-    print(f"=== End Peer Analysis ===\n")
-    
+        
     portfolio_stats = _calculate_portfolio_statistics(peer_analysis)
     
     for company_name in peer_analysis.keys():

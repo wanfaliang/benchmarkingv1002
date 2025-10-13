@@ -1379,7 +1379,7 @@ def _analyze_comprehensive_correlations(df: pd.DataFrame, economic_df: pd.DataFr
     numeric_econ_cols = econ_data.select_dtypes(include=[np.number]).columns
     econ_numeric = econ_data[numeric_econ_cols]
     
-    print(f"Testing correlations with lags [0, 1, 2] years across {len(numeric_econ_cols)} macro indicators...")
+    
     
     for company_name in companies.keys():
         company_data = df[df['Company'] == company_name].sort_values('Year')
@@ -1492,8 +1492,7 @@ def _analyze_comprehensive_correlations(df: pd.DataFrame, economic_df: pd.DataFr
             for corr_data in sorted_correlations.values():
                 lag_counts[corr_data['best_lag']] += 1
             
-            print(f"  {company_name}: Found {len(sorted_correlations)} correlations " + 
-                  f"(Lag 0: {lag_counts[0]}, Lag 1: {lag_counts[1]}, Lag 2: {lag_counts[2]})")
+            
             
             correlation_results[company_name] = {
                 'all_correlations': sorted_correlations,
