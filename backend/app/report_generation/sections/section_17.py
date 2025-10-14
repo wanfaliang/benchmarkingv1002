@@ -2065,7 +2065,7 @@ def _build_section_17c1_multi_timeframe(
 
 def _create_chart_17c1_signal_comparison(signals: Dict) -> str:
     """Create comparison chart"""
-    companies = [c[:12] for c in signals.keys()]
+    companies = list(signals.keys())
     daily_sig = [s['daily_significant'] for s in signals.values()]
     daily_total = [s['daily_total'] for s in signals.values()]
     quarterly_sig = [s['quarterly_significant'] for s in signals.values()]
@@ -2362,7 +2362,7 @@ def _build_section_17c2_lead_lag(
 
 def _create_chart_17c2_correlation_comparison(lead_lag_analysis: Dict) -> str:
     """Create correlation comparison"""
-    companies = [c[:12] for c in lead_lag_analysis.keys()]
+    companies = list(lead_lag_analysis.keys())
     mom_vol_corrs = []
     short_long_corrs = []
     
@@ -2418,7 +2418,7 @@ def _create_chart_17c2_pvalue_scatter(lead_lag_analysis: Dict) -> str:
 
 def _create_chart_17c2_heatmap(lead_lag_analysis: Dict) -> str:
     """Create correlation heatmap"""
-    companies = list(lead_lag_analysis.keys())[:10]
+    companies = list(lead_lag_analysis.keys())
     metrics_names = ['Mom→Vol (|r|)', 'Short→Long (r)']
     
     matrix = []

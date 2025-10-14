@@ -3,16 +3,20 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 from fastapi.responses import FileResponse, HTMLResponse
-from ..services.file_service import file_service
+import shutil
+from pathlib import Path
+import asyncio
+
 
 from ..database import get_db
-from ..schemas.analysis import AnalysisCreate, AnalysisResponse
-from ..services.analysis_service import create_analysis, get_user_analyses, get_analysis_by_id
+from ..schemas.analysis import AnalysisCreate, AnalysisResponse, AnalysisNameUpdate, AnalysisFullUpdate
+from ..services.analysis_service import create_analysis, get_user_analyses, get_analysis_by_id, update_analysis_configuration, reset_analysis_state, delete_sections_and_files
 from ..core.deps import get_current_user
 from ..models.user import User
 from ..services.data_collection_service import data_collection_service
 from ..report_generation.section_runner import run_section_generation
 from ..models.section import Section
+from ..services.file_service import file_service
 
 router = APIRouter(prefix="/api/analyses", tags=["analyses"])
 
@@ -48,6 +52,110 @@ def get_analysis(
         )
     return analysis
 
+@router.patch("/{analysis_id}")
+async def update_analysis_name(
+    analysis_id: str,
+    update_data: AnalysisNameUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update only the analysis name (lightweight operation):
+    - Updates: Analysis name
+    - Keeps: All configuration and data unchanged
+    - No data deletion
+    """
+    # Get the analysis
+    analysis = get_analysis_by_id(db, analysis_id, current_user)
+    if not analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found"
+        )
+    
+    try:
+        # Update only the name
+        analysis.name = update_data.name
+        db.commit()
+        db.refresh(analysis)
+        
+        return {
+            "message": "Analysis name updated successfully",
+            "analysis_id": analysis_id,
+            "name": analysis.name
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update analysis name: {str(e)}"
+        )
+
+
+@router.put("/{analysis_id}")
+async def update_analysis_full(
+    analysis_id: str,
+    update_data: AnalysisFullUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update full analysis configuration (companies, years_back, name):
+    - Updates: Companies, years_back, name
+    - Deletes: All Section records and all generated files
+    - Resets: Status to 'created', progress to 0, clears timestamps
+    
+    Use this when you need to change the analysis scope or companies.
+    """
+    # Get the analysis
+    analysis = get_analysis_by_id(db, analysis_id, current_user)
+    if not analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found"
+        )
+    
+    try:
+        # Delete sections and files using service
+        sections_deleted, files_deleted = await delete_sections_and_files(db, analysis_id)
+        
+        # Update analysis configuration using service
+        update_analysis_configuration(
+            analysis,
+            companies=update_data.companies,
+            years_back=update_data.years_back,
+            name=update_data.name
+        )
+        
+        # Reset state since configuration changed
+        reset_analysis_state(analysis, status="created")
+        
+        db.commit()
+        db.refresh(analysis)
+        
+        # Recreate the directory structure
+        file_service.create_analysis_dirs(analysis_id)
+        
+        return {
+            "message": "Analysis updated successfully",
+            "analysis_id": analysis_id,
+            "name": analysis.name,
+            "companies": analysis.companies,
+            "years_back": analysis.years_back,
+            "sections_deleted": sections_deleted,
+            "files_deleted": files_deleted,
+            "status": analysis.status,
+            "note": "Configuration updated. All data cleared. Ready for fresh data collection."
+        }
+        
+    except Exception as e:
+        # Rollback database changes if anything fails
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update analysis: {str(e)}"
+        )
 # Add new endpoint
 @router.post("/{analysis_id}/start-collection")
 def start_data_collection(
@@ -156,6 +264,217 @@ def start_analysis_generation(
         "status": "generating"
     }
 
+@router.post("/{analysis_id}/restart-analysis")
+async def restart_analysis(
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Restart analysis generation (Phase B) while keeping collected data (Phase A):
+    - Keeps: Analysis record, raw_data.xlsx, financial_collector.pkl
+    - Deletes: All Section records and section HTML files
+    - Resets: Status to 'collection_complete', Phase to 'A', progress to 100
+    
+    Use this to regenerate analysis sections without re-collecting data.
+    """
+    # Get the analysis
+    analysis = get_analysis_by_id(db, analysis_id, current_user)
+    if not analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found"
+        )
+    
+    # Verify that raw data exists (Phase A was completed)
+    if not file_service.raw_data_exists(analysis_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot restart analysis. Raw data not found. Please run data collection first."
+        )
+    
+    if not file_service.collector_pickle_exists(analysis_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot restart analysis. Collector pickle not found. Please run data collection first."
+        )
+    
+    try:
+        # Step 1: Delete all related sections from database
+        sections_deleted = db.query(Section).filter(
+            Section.analysis_id == analysis_id
+        ).delete()
+        
+        # Step 2: Reset analysis to collection_complete state
+        analysis.status = "collection_complete"
+        analysis.phase = "A"
+        analysis.progress = 100  # Phase A complete, ready for Phase B
+        # Clear Phase B timestamps but keep Phase A completion info
+        analysis.started_at = None
+        analysis.completed_at = None
+        analysis.error_log = None
+        
+        db.commit()
+        
+        # Step 3: Delete only the sections directory (keep Excel and pickle files)
+        sections_dir = file_service.get_sections_dir(analysis_id)
+        files_deleted = 0
+        
+        if sections_dir.exists():
+            # Count files before deletion
+            files_deleted = sum(1 for _ in sections_dir.glob("*.html"))
+            # Run the blocking file operation in a thread pool
+            await asyncio.to_thread(shutil.rmtree, sections_dir)
+            # Recreate empty sections directory
+            sections_dir.mkdir(parents=True, exist_ok=True)
+        
+        return {
+            "message": "Analysis restarted successfully",
+            "analysis_id": analysis_id,
+            "analysis_name": analysis.name,
+            "sections_deleted": sections_deleted,
+            "html_files_deleted": files_deleted,
+            "status": analysis.status,
+            "phase": analysis.phase,
+            "progress": analysis.progress,
+            "raw_data_preserved": True,
+            "collector_preserved": True,
+            "note": "Phase A data preserved. Ready to regenerate Phase B analysis sections."
+        }
+        
+    except Exception as e:
+        # Rollback database changes if anything fails
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to restart analysis: {str(e)}"
+        )
+    
+@router.delete("/{analysis_id}")
+async def delete_analysis(
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Delete an analysis and all its associated data:
+    - Database: Analysis record and all Section records
+    - File system: All files in the analysis directory (Excel, pickle, HTML sections)
+    """
+    # Get the analysis
+    analysis = get_analysis_by_id(db, analysis_id, current_user)
+    if not analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found"
+        )
+    
+    try:
+        # Step 1: Delete all related sections from database
+        sections_deleted = db.query(Section).filter(
+            Section.analysis_id == analysis_id
+        ).delete()
+        
+        # Step 2: Delete the analysis from database
+        db.delete(analysis)
+        db.commit()
+        
+        # Step 3: Delete the entire analysis directory and all its contents (async)
+        analysis_dir = file_service.get_analysis_dir(analysis_id)
+        files_deleted = False
+        
+        if analysis_dir.exists():
+            # Run the blocking file operation in a thread pool
+            
+            await asyncio.to_thread(shutil.rmtree, analysis_dir)
+            files_deleted = True
+        
+        return {
+            "message": "Analysis deleted successfully",
+            "analysis_id": analysis_id,
+            "sections_deleted": sections_deleted,
+            "files_deleted": files_deleted,
+            "directory_path": str(analysis_dir)
+        }
+        
+    except Exception as e:
+        # Rollback database changes if anything fails
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete analysis: {str(e)}"
+        )
+
+
+# RESET endpoint - keeps the analysis but clears all data/sections
+@router.post("/{analysis_id}/reset")
+async def reset_analysis(
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Reset an analysis to start fresh:
+    - Keeps: Analysis record (companies, years_back, name, etc.)
+    - Deletes: All Section records and all generated files
+    - Resets: Status to 'created', progress to 0, clears timestamps and errors
+    
+    Use this to re-run data collection with updated data.
+    """
+    # Get the analysis
+    analysis = get_analysis_by_id(db, analysis_id, current_user)
+    if not analysis:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found"
+        )
+    
+    try:
+        # Step 1: Delete all related sections from database
+        sections_deleted = db.query(Section).filter(
+            Section.analysis_id == analysis_id
+        ).delete()
+        
+        # Step 2: Reset analysis state (keep the analysis record itself)
+        analysis.status = "created"
+        analysis.phase = None
+        analysis.progress = 0
+        analysis.started_at = None
+        analysis.completed_at = None
+        analysis.error_log = None
+        
+        db.commit()
+        
+        # Step 3: Delete all files but keep the directory structure (async)
+        analysis_dir = file_service.get_analysis_dir(analysis_id)
+        files_deleted = False
+        
+        if analysis_dir.exists():
+            # Run the blocking file operation in a thread pool
+            import asyncio
+            await asyncio.to_thread(shutil.rmtree, analysis_dir)
+            files_deleted = True
+            
+            # Recreate the directory structure
+            file_service.create_analysis_dirs(analysis_id)
+        
+        return {
+            "message": "Analysis reset successfully",
+            "analysis_id": analysis_id,
+            "analysis_name": analysis.name,
+            "sections_deleted": sections_deleted,
+            "files_deleted": files_deleted,
+            "status": analysis.status,
+            "note": "Analysis is ready for fresh data collection"
+        }
+        
+    except Exception as e:
+        # Rollback database changes if anything fails
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reset analysis: {str(e)}"
+        )
 
 @router.get("/{analysis_id}/sections")
 def get_analysis_sections(

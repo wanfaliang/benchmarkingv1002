@@ -13,6 +13,16 @@ class AnalysisCreate(BaseModel):
     years_back: int = 10
     name: Optional[str] = None
 
+# Schema for PATCH (name only)
+class AnalysisNameUpdate(BaseModel):
+    name: str
+
+# Schema for PUT (full update) - same as AnalysisCreate
+class AnalysisFullUpdate(BaseModel):
+    companies: List[CompanyInfo]
+    years_back: int = 10
+    name: Optional[str] = None
+
 class AnalysisResponse(BaseModel):
     """Schema for analysis response"""
     analysis_id: str
