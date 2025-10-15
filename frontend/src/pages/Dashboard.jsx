@@ -3,13 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { analysisAPI } from '../services/api';
-import { Plus, TrendingUp, LogOut, Search, Clock, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { Plus, TrendingUp, LogOut, Search, Clock, CheckCircle, AlertCircle, Trash2, Edit2, X, Check } from 'lucide-react';
 
 const Dashboard = () => {
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState('');
   
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -29,7 +31,8 @@ const Dashboard = () => {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, e) => {
+    e.stopPropagation();
     if (window.confirm('Are you sure you want to delete this analysis?')) {
       try {
         await analysisAPI.delete(id);
@@ -37,6 +40,37 @@ const Dashboard = () => {
       } catch (err) {
         alert('Failed to delete analysis');
       }
+    }
+  };
+
+  const startEditName = (analysis, e) => {
+    e.stopPropagation();
+    setEditingId(analysis.analysis_id);
+    setEditingName(analysis.name || 'Untitled Analysis');
+  };
+
+  const cancelEditName = (e) => {
+    e.stopPropagation();
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  const saveEditName = async (id, e) => {
+    e.stopPropagation();
+    if (!editingName.trim()) {
+      alert('Name cannot be empty');
+      return;
+    }
+
+    try {
+      await analysisAPI.updateName(id, editingName);
+      setAnalyses(analyses.map(a => 
+        a.analysis_id === id ? { ...a, name: editingName } : a
+      ));
+      setEditingId(null);
+      setEditingName('');
+    } catch (err) {
+      alert('Failed to update name');
     }
   };
 
@@ -254,9 +288,79 @@ const Dashboard = () => {
                 onClick={() => navigate(`/analysis/${analysis.analysis_id}`)}
               >
                 <div style={{ marginBottom: '1rem' }}>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.5rem', color: '#1f2937' }}>
-                    {analysis.name || 'Untitled Analysis'}
-                  </h3>
+                  {/* Name with inline editing */}
+                  {editingId === analysis.analysis_id ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          flex: 1,
+                          padding: '0.5rem',
+                          border: '2px solid #667eea',
+                          borderRadius: '6px',
+                          fontSize: '1rem',
+                          fontWeight: '600'
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        onClick={(e) => saveEditName(analysis.analysis_id, e)}
+                        style={{
+                          padding: '0.5rem',
+                          background: '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <Check size={18} />
+                      </button>
+                      <button
+                        onClick={cancelEditName}
+                        style={{
+                          padding: '0.5rem',
+                          background: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: '600', color: '#1f2937', flex: 1 }}>
+                        {analysis.name || 'Untitled Analysis'}
+                      </h3>
+                      <button
+                        onClick={(e) => startEditName(analysis, e)}
+                        style={{
+                          padding: '0.4rem',
+                          background: '#f3f4f6',
+                          color: '#6b7280',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        title="Edit name"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                    </div>
+                  )}
+                  
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
                     {analysis.companies?.map((company, idx) => (
                       <span
@@ -310,10 +414,7 @@ const Dashboard = () => {
                     {new Date(analysis.created_at).toLocaleDateString()}
                   </span>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(analysis.analysis_id);
-                    }}
+                    onClick={(e) => handleDelete(analysis.analysis_id, e)}
                     style={{
                       padding: '0.4rem 0.8rem',
                       background: '#fee2e2',
