@@ -1,4 +1,3 @@
-// frontend/src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
@@ -12,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import CreateAnalysis from './pages/CreateAnalysis';
 import AnalysisDetail from './pages/AnalysisDetail';
 import SectionViewer from './pages/SectionViewer';
+import GoogleCallback from './pages/GoogleCallback';  // NEW
 
 function App() {
   return (
@@ -22,6 +22,7 @@ function App() {
           <Route path="/" element={<Homepage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/auth/google/callback" element={<GoogleCallback />} />  {/* NEW */}
 
           {/* Protected routes */}
           <Route

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import GoogleLoginButton from '../components/GoogleLoginButton';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -101,6 +102,24 @@ const Register = () => {
             {error}
           </div>
         )}
+
+        {/* NEW: Google Sign-In Button */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <GoogleLoginButton />
+        </div>
+
+        {/* NEW: Divider */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          margin: '1.5rem 0'
+        }}>
+          <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }}></div>
+          <span style={{ padding: '0 1rem', color: '#6b7280', fontSize: '0.9rem' }}>
+            or sign up with email
+          </span>
+          <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }}></div>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">

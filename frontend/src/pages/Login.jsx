@@ -1,7 +1,7 @@
-// frontend/src/pages/Login.jsx
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import GoogleLoginButton from '../components/GoogleLoginButton';  // NEW
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -22,13 +22,11 @@ const Login = () => {
     if (result.success) {
       navigate('/dashboard');
     } else {
-      // Handle different error formats
       let errorMessage = 'Login failed';
       
       if (typeof result.error === 'string') {
         errorMessage = result.error;
       } else if (result.error && typeof result.error === 'object') {
-        // Handle validation errors from FastAPI
         if (Array.isArray(result.error)) {
           errorMessage = result.error.map(err => err.msg).join(', ');
         } else if (result.error.detail) {
@@ -90,6 +88,24 @@ const Login = () => {
             {error}
           </div>
         )}
+
+        {/* NEW: Google Sign-In Button */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <GoogleLoginButton />
+        </div>
+
+        {/* NEW: Divider */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          margin: '1.5rem 0'
+        }}>
+          <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }}></div>
+          <span style={{ padding: '0 1rem', color: '#6b7280', fontSize: '0.9rem' }}>
+            or continue with email
+          </span>
+          <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }}></div>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">

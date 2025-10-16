@@ -1,4 +1,3 @@
-"""User schemas for API requests/responses"""
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional
@@ -17,6 +16,10 @@ class UserResponse(UserBase):
     user_id: str
     is_active: bool
     created_at: datetime
+    
+    # NEW: Google OAuth fields (optional for backward compatibility)
+    auth_provider: Optional[str] = "local"
+    avatar_url: Optional[str] = None
     
     class Config:
         from_attributes = True

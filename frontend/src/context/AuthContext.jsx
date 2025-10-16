@@ -1,4 +1,8 @@
-// frontend/src/context/AuthContext.jsx
+// ============================================================================
+// STEP 1: Update AuthContext.jsx - Add Google OAuth support
+// File: frontend/src/context/AuthContext.jsx
+// ============================================================================
+
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { authAPI } from '../services/api';
 
@@ -78,6 +82,32 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // NEW: Google OAuth login
+  const loginWithGoogle = async (idToken) => {
+    try {
+      const response = await authAPI.verifyGoogleToken(idToken);
+      const { access_token } = response.data;
+      
+      localStorage.setItem('token', access_token);
+      
+      // Fetch user data after setting token
+      const userResponse = await authAPI.getCurrentUser();
+      const userData = userResponse.data;
+      
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+      setIsAuthenticated(true);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Google login error:', error.response?.data);
+      return {
+        success: false,
+        error: error.response?.data?.detail || 'Google login failed',
+      };
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -91,6 +121,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     register,
+    loginWithGoogle,  // NEW: Add to context value
     logout,
   };
 

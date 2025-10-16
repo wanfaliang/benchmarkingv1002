@@ -14,10 +14,15 @@ class User(Base):
     
     user_id = Column(String, primary_key=True, default=generate_uuid)
     email = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
+    password_hash = Column(String, nullable=True)  # Changed to nullable=True
     full_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # NEW: Google OAuth fields
+    google_id = Column(String, unique=True, nullable=True, index=True)
+    auth_provider = Column(String, default="local")  # "local" or "google"
+    avatar_url = Column(String, nullable=True)
     
     # Relationship
     analyses = relationship("Analysis", back_populates="user", cascade="all, delete-orphan")

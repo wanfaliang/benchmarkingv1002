@@ -48,6 +48,9 @@ export const authAPI = {
     },
   }),
   getCurrentUser: () => api.get('/api/auth/me'),
+  verifyGoogleToken: (idToken) => {
+    return api.post('/api/auth/google/verify', { id_token: idToken });
+  },
 };
 
 // Ticker validation
