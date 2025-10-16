@@ -24,5 +24,10 @@ class User(Base):
     auth_provider = Column(String, default="local")  # "local" or "google"
     avatar_url = Column(String, nullable=True)
     
+    # NEW: Email verification fields
+    email_verified = Column(Boolean, default=False)
+    verification_token = Column(String, nullable=True)
+    verification_token_expires = Column(DateTime, nullable=True)
+    
     # Relationship
     analyses = relationship("Analysis", back_populates="user", cascade="all, delete-orphan")

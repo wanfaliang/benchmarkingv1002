@@ -16,6 +16,33 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+  // NEW: State for verification banner
+  const [showBanner, setShowBanner] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState('');
+
+  // NEW: Check if user needs to verify email
+  useEffect(() => {
+    if (user && !user.email_verified && user.auth_provider === 'local') {
+      setShowBanner(true);
+    }
+  }, [user]);
+
+  // NEW: Handler for resending verification email
+  const handleResendVerification = async () => {
+    setResendingEmail(true);
+    setBannerMessage('');
+    
+    try {
+      await authAPI.resendVerification(user.email);
+      setBannerMessage('Verification email sent! Please check your inbox.');
+    } catch (error) {
+      setBannerMessage(error.response?.data?.detail || 'Failed to resend email. Please try again.');
+    } finally {
+      setResendingEmail(false);
+    }
+  };
+
   useEffect(() => {
     fetchAnalyses();
   }, []);
@@ -119,6 +146,85 @@ const Dashboard = () => {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb' }}>
+      {/* NEW: Verification Banner - Place this at the top of your dashboard */}
+      {showBanner && (
+        <div style={{
+          background: '#fef3c7',
+          borderLeft: '4px solid #f59e0b',
+          padding: '1rem',
+          marginBottom: '1rem',
+          borderRadius: '8px'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <div style={{ 
+                fontWeight: '600', 
+                color: '#92400e',
+                marginBottom: '0.25rem' 
+              }}>
+                📧 Email not verified
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#78350f' }}>
+                Please check your inbox and verify your email address to access all features.
+              </div>
+              {bannerMessage && (
+                <div style={{
+                  marginTop: '0.5rem',
+                  fontSize: '0.85rem',
+                  color: bannerMessage.includes('Failed') ? '#dc2626' : '#059669'
+                }}>
+                  {bannerMessage}
+                </div>
+              )}
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '0.5rem',
+              flexShrink: 0 
+            }}>
+              <button
+                onClick={handleResendVerification}
+                disabled={resendingEmail}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: resendingEmail ? '#d97706' : '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: resendingEmail ? 'not-allowed' : 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.9rem',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {resendingEmail ? 'Sending...' : 'Resend Email'}
+              </button>
+              <button
+                onClick={() => setShowBanner(false)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: 'transparent',
+                  color: '#92400e',
+                  border: '1px solid #f59e0b',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem'
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{
         background: 'white',

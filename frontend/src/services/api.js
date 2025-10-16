@@ -51,6 +51,11 @@ export const authAPI = {
   verifyGoogleToken: (idToken) => {
     return api.post('/api/auth/google/verify', { id_token: idToken });
   },
+  // NEW: Email verification endpoints
+  verifyEmail: (token) => api.get(`/api/auth/verify-email/${token}`),
+  resendVerification: (email) => api.post('/api/auth/resend-verification', null, {
+    params: { email }
+  }),
 };
 
 // Ticker validation

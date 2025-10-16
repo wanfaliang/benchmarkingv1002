@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = "sqlite:///./financial_analysis.db"
+    FRONTEND_URL: str = "http://localhost:3000"
     
     # Security
     SECRET_KEY: str
@@ -27,6 +28,9 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
     GOOGLE_REDIRECT_URI: str
+
+    RESEND_API_KEY: str
+    FROM_EMAIL: str = "onboarding@resend.dev"  # Default Resend test email
     
     class Config:
         env_file = ".env"

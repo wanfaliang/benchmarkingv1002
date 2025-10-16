@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from pydantic import EmailStr
 
 from ..database import get_db
 from ..schemas.user import UserCreate, UserResponse, UserLogin
@@ -12,6 +13,7 @@ from ..core.deps import get_current_user
 from ..models.user import User
 from ..services.google_oauth_service import verify_google_token
 from ..config import settings
+from ..services.auth_service import verify_email_token, resend_verification_email
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
@@ -126,3 +128,18 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
         return RedirectResponse(
             url=f"{settings.FRONTEND_URL}/login?error={str(e)}"
         )
+
+@router.get("/verify-email/{token}")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    """Verify email address using token from email"""
+    user = verify_email_token(db, token)
+    return {
+        "message": "Email verified successfully!",
+        "email": user.email
+    }
+
+
+@router.post("/resend-verification")
+def resend_verification(email: EmailStr, db: Session = Depends(get_db)):
+    """Resend verification email"""
+    return resend_verification_email(db, email)

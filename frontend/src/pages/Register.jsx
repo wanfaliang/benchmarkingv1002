@@ -27,20 +27,20 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
+  
     // Validation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-
+  
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
     }
-
+  
     setLoading(true);
-
+  
     const result = await register({
       email: formData.email,
       password: formData.password,
@@ -48,7 +48,10 @@ const Register = () => {
     });
     
     if (result.success) {
-      navigate('/dashboard');
+      // CHANGED: Redirect to success page instead of dashboard
+      navigate('/registration-success', { 
+        state: { email: formData.email } 
+      });
     } else {
       setError(result.error);
     }

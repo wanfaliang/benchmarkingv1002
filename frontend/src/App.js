@@ -12,6 +12,8 @@ import CreateAnalysis from './pages/CreateAnalysis';
 import AnalysisDetail from './pages/AnalysisDetail';
 import SectionViewer from './pages/SectionViewer';
 import GoogleCallback from './pages/GoogleCallback';  // NEW
+import VerifyEmail from './pages/VerifyEmail';
+import RegistrationSuccess from './pages/RegistrationSuccess';
 
 function App() {
   return (
@@ -23,6 +25,10 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/auth/google/callback" element={<GoogleCallback />} />  {/* NEW */}
+          {/* NEW: Email verification routes */}
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/registration-success" element={<RegistrationSuccess />} />
+
 
           {/* Protected routes */}
           <Route

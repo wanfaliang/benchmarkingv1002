@@ -20,6 +20,9 @@ class UserResponse(UserBase):
     # NEW: Google OAuth fields (optional for backward compatibility)
     auth_provider: Optional[str] = "local"
     avatar_url: Optional[str] = None
+
+    # NEW: Email verification field
+    email_verified: bool = False
     
     class Config:
         from_attributes = True
