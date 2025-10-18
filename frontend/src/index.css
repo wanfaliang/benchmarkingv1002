@@ -1,4 +1,37 @@
 /* frontend/src/index.css */
+:root[data-theme="light"] {
+  --header-bg: #ffffff;
+  --dropdown-bg: #ffffff;
+  --section-bg: #f9fafb;
+  --hover-bg: #f3f4f6;
+  --active-bg: #ede9fe;
+  --border-color: #e5e7eb;
+  --text-color: #111827;
+  --text-secondary: #6b7280;
+  --primary-color: #667eea;
+  --badge-bg: #f3f4f6;
+}
+
+:root[data-theme="dark"] {
+  --header-bg: #1f2937;
+  --dropdown-bg: #111827;
+  --section-bg: #0f172a;
+  --hover-bg: #374151;
+  --active-bg: #4c1d95;
+  --border-color: #374151;
+  --text-color: #f9fafb;
+  --text-secondary: #9ca3af;
+  --primary-color: #818cf8;
+  --badge-bg: #374151;
+}
+
+body {
+  background: var(--section-bg);
+  color: var(--text-color);
+  transition: background 0.3s, color 0.3s;
+}
+
+
 * {
   margin: 0;
   padding: 0;

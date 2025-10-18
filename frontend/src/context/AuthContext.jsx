@@ -50,11 +50,15 @@ export const AuthProvider = ({ children }) => {
       formData.append('password', password);
       
       const response = await authAPI.login(formData);
-      const { access_token, user: userData } = response.data;
+      const { access_token} = response.data;
       
       localStorage.setItem('token', access_token);
-      localStorage.setItem('user', JSON.stringify(userData));
+      // localStorage.setItem('user', JSON.stringify(userData));
       
+      const userResponse = await authAPI.getCurrentUser();
+      const userData = userResponse.data;
+
+      localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
       setIsAuthenticated(true);
       

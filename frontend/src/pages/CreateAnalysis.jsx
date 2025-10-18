@@ -4,12 +4,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analysisAPI, tickerAPI } from '../services/api';
-import { Plus, X, TrendingUp, LogOut, AlertCircle, Loader } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { Plus, X,  AlertCircle, Loader } from 'lucide-react';
+// simport { useAuth } from '../context/AuthContext';
 
 const CreateAnalysis = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  // const { user, logout } = useAuth();
 
   const [analysisName, setAnalysisName] = useState('');
   const [years, setYears] = useState(10);
@@ -116,55 +116,7 @@ const addTicker = async () => {
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb' }}>
       {/* Header */}
-      <div style={{
-        background: 'white',
-        borderBottom: '1px solid #e5e7eb',
-        padding: '1rem 5%'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          maxWidth: '1400px',
-          margin: '0 auto'
-        }}>
-          <div 
-            onClick={() => navigate('/dashboard')}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.5rem', 
-              fontSize: '1.5rem', 
-              fontWeight: 'bold', 
-              color: '#667eea',
-              cursor: 'pointer'
-            }}>
-            <TrendingUp size={28} />
-            FinanceHub
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <span style={{ color: '#6b7280' }}>Welcome, {user?.full_name}</span>
-            <button
-              onClick={logout}
-              style={{
-                padding: '0.6rem 1.2rem',
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontWeight: '600'
-              }}
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
+      
 
       {/* Main Content */}
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '3rem 5%' }}>

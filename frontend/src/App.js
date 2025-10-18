@@ -1,7 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import Header from './components/Header';  // NEW
 
 // Pages
 import Homepage from './pages/Homepage.jsx';
@@ -18,56 +20,60 @@ import RegistrationSuccess from './pages/RegistrationSuccess';
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<Homepage />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/auth/google/callback" element={<GoogleCallback />} />  {/* NEW */}
-          {/* NEW: Email verification routes */}
-          <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/registration-success" element={<RegistrationSuccess />} />
+      <ThemeProvider>  {/* NEW: Wrap with ThemeProvider */}
+        <Router>
+          <Header />  {/* NEW: Add Header */}
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<Homepage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/auth/google/callback" element={<GoogleCallback />} />  {/* NEW */}
+            {/* NEW: Email verification routes */}
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/registration-success" element={<RegistrationSuccess />} />
 
 
-          {/* Protected routes */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/analysis/create"
-            element={
-              <ProtectedRoute>
-                <CreateAnalysis />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/analysis/:id"
-            element={
-              <ProtectedRoute>
-                <AnalysisDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/analysis/:id/section/:sectionNum"
-            element={
-              <ProtectedRoute>
-                <SectionViewer />
-              </ProtectedRoute>
-            }
-          />
+            {/* Protected routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analysis/create"
+              element={
+                <ProtectedRoute>
+                  <CreateAnalysis />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analysis/:id"
+              element={
+                <ProtectedRoute>
+                  <AnalysisDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analysis/:id/section/:sectionNum"
+              element={
+                <ProtectedRoute>
+                  <SectionViewer />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Catch all - redirect to home */}
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </Router>
+            {/* Catch all - redirect to home */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+
+        </Router>
+      </ThemeProvider>
     </AuthProvider>
   );
 }

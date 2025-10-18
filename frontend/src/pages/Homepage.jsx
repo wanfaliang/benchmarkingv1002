@@ -1,4 +1,3 @@
-// frontend/src/pages/Homepage.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, BarChart3, PieChart, Newspaper, Database, Wrench, ArrowRight } from 'lucide-react';
@@ -51,50 +50,7 @@ const Homepage = () => {
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      {/* Navigation */}
-      <nav style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '1.5rem 5%',
-        background: 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
-      }}>
-        <div style={{ 
-          fontSize: '1.5rem', 
-          fontWeight: 'bold', 
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <TrendingUp size={28} />
-          FinanceHub
-        </div>
-        <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-          <a href="#modules" style={{ color: 'white', textDecoration: 'none', fontSize: '1rem' }}>Modules</a>
-          <a href="#about" style={{ color: 'white', textDecoration: 'none', fontSize: '1rem' }}>About</a>
-          <button 
-            onClick={() => navigate('/login')}
-            style={{
-              padding: '0.6rem 1.5rem',
-              background: 'white',
-              color: '#667eea',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '1rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'transform 0.2s'
-            }}
-            onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
-            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-          >
-            Login
-          </button>
-        </div>
-      </nav>
+      {/* REMOVED OLD NAVIGATION - Now using Header component from App.js */}
 
       {/* Hero Section */}
       <div style={{
@@ -119,7 +75,7 @@ const Homepage = () => {
         }}>
           Comprehensive data analysis, quantitative trading, and portfolio management tools for investment professionals
         </p>
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button 
             onClick={() => navigate('/register')}
             style={{

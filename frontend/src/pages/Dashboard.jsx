@@ -1,9 +1,8 @@
-// frontend/src/pages/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { analysisAPI } from '../services/api';
-import { Plus, TrendingUp, LogOut, Search, Clock, CheckCircle, AlertCircle, Trash2, Edit2, X, Check } from 'lucide-react';
+import { analysisAPI, authAPI } from '../services/api';
+import { Plus, Search, Clock, CheckCircle, AlertCircle, Trash2, Edit2, X, Check } from 'lucide-react';
 
 const Dashboard = () => {
   const [analyses, setAnalyses] = useState([]);
@@ -14,21 +13,21 @@ const Dashboard = () => {
   const [editingName, setEditingName] = useState('');
   
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
-  // NEW: State for verification banner
+  // State for verification banner
   const [showBanner, setShowBanner] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
   const [bannerMessage, setBannerMessage] = useState('');
 
-  // NEW: Check if user needs to verify email
+  // Check if user needs to verify email
   useEffect(() => {
     if (user && !user.email_verified && user.auth_provider === 'local') {
       setShowBanner(true);
     }
   }, [user]);
 
-  // NEW: Handler for resending verification email
+  // Handler for resending verification email
   const handleResendVerification = async () => {
     setResendingEmail(true);
     setBannerMessage('');
@@ -145,129 +144,90 @@ const Dashboard = () => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f9fafb' }}>
-      {/* NEW: Verification Banner - Place this at the top of your dashboard */}
-      {showBanner && (
-        <div style={{
-          background: '#fef3c7',
-          borderLeft: '4px solid #f59e0b',
-          padding: '1rem',
-          marginBottom: '1rem',
-          borderRadius: '8px'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '1rem'
-          }}>
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <div style={{ 
-                fontWeight: '600', 
-                color: '#92400e',
-                marginBottom: '0.25rem' 
-              }}>
-                📧 Email not verified
-              </div>
-              <div style={{ fontSize: '0.9rem', color: '#78350f' }}>
-                Please check your inbox and verify your email address to access all features.
-              </div>
-              {bannerMessage && (
-                <div style={{
-                  marginTop: '0.5rem',
-                  fontSize: '0.85rem',
-                  color: bannerMessage.includes('Failed') ? '#dc2626' : '#059669'
-                }}>
-                  {bannerMessage}
-                </div>
-              )}
-            </div>
-            
-            <div style={{ 
-              display: 'flex', 
-              gap: '0.5rem',
-              flexShrink: 0 
-            }}>
-              <button
-                onClick={handleResendVerification}
-                disabled={resendingEmail}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: resendingEmail ? '#d97706' : '#f59e0b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: resendingEmail ? 'not-allowed' : 'pointer',
-                  fontWeight: '600',
-                  fontSize: '0.9rem',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {resendingEmail ? 'Sending...' : 'Resend Email'}
-              </button>
-              <button
-                onClick={() => setShowBanner(false)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: 'transparent',
-                  color: '#92400e',
-                  border: '1px solid #f59e0b',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem'
-                }}
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Header */}
-      <div style={{
-        background: 'white',
-        borderBottom: '1px solid #e5e7eb',
-        padding: '1rem 5%'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          maxWidth: '1400px',
-          margin: '0 auto'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.5rem', fontWeight: 'bold', color: '#667eea' }}>
-            <TrendingUp size={28} />
-            FinanceHub
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <span style={{ color: '#6b7280' }}>Welcome, {user?.full_name}</span>
-            <button
-              onClick={logout}
-              style={{
-                padding: '0.6rem 1.2rem',
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontWeight: '600'
-              }}
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
+    <div style={{ minHeight: '100vh', background: 'var(--section-bg)' }}>
+      {/* REMOVED OLD HEADER - Now using Header component from App.js */}
 
       {/* Main Content */}
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 5%' }}>
+        {/* Verification Banner */}
+        {showBanner && (
+          <div style={{
+            background: '#fef3c7',
+            borderLeft: '4px solid #f59e0b',
+            padding: '1rem',
+            marginBottom: '2rem',
+            borderRadius: '8px'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <div style={{ flex: 1, minWidth: '200px' }}>
+                <div style={{ 
+                  fontWeight: '600', 
+                  color: '#92400e',
+                  marginBottom: '0.25rem' 
+                }}>
+                  📧 Email not verified
+                </div>
+                <div style={{ fontSize: '0.9rem', color: '#78350f' }}>
+                  Please check your inbox and verify your email address to access all features.
+                </div>
+                {bannerMessage && (
+                  <div style={{
+                    marginTop: '0.5rem',
+                    fontSize: '0.85rem',
+                    color: bannerMessage.includes('Failed') ? '#dc2626' : '#059669'
+                  }}>
+                    {bannerMessage}
+                  </div>
+                )}
+              </div>
+              
+              <div style={{ 
+                display: 'flex', 
+                gap: '0.5rem',
+                flexShrink: 0 
+              }}>
+                <button
+                  onClick={handleResendVerification}
+                  disabled={resendingEmail}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: resendingEmail ? '#d97706' : '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: resendingEmail ? 'not-allowed' : 'pointer',
+                    fontWeight: '600',
+                    fontSize: '0.9rem',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {resendingEmail ? 'Sending...' : 'Resend Email'}
+                </button>
+                <button
+                  onClick={() => setShowBanner(false)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: 'transparent',
+                    color: '#92400e',
+                    border: '1px solid #f59e0b',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem'
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Top Bar */}
         <div style={{
           display: 'flex',
@@ -277,7 +237,7 @@ const Dashboard = () => {
           flexWrap: 'wrap',
           gap: '1rem'
         }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1f2937' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--text-color)' }}>
             My Analyses
           </h1>
           <button
@@ -318,9 +278,11 @@ const Dashboard = () => {
             style={{
               width: '100%',
               padding: '0.8rem 1rem 0.8rem 3rem',
-              border: '1px solid #d1d5db',
+              border: '1px solid var(--border-color)',
               borderRadius: '8px',
-              fontSize: '1rem'
+              fontSize: '1rem',
+              background: 'var(--header-bg)',
+              color: 'var(--text-color)'
             }}
           />
         </div>
@@ -341,13 +303,13 @@ const Dashboard = () => {
         {/* Analyses Grid */}
         {filteredAnalyses.length === 0 ? (
           <div style={{
-            background: 'white',
+            background: 'var(--header-bg)',
             padding: '4rem',
             borderRadius: '12px',
             textAlign: 'center',
-            border: '2px dashed #d1d5db'
+            border: '2px dashed var(--border-color)'
           }}>
-            <p style={{ color: '#6b7280', fontSize: '1.1rem', marginBottom: '1rem' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', marginBottom: '1rem' }}>
               No analyses found
             </p>
             <button
@@ -376,10 +338,10 @@ const Dashboard = () => {
               <div
                 key={analysis.analysis_id}
                 style={{
-                  background: 'white',
+                  background: 'var(--header-bg)',
                   padding: '1.5rem',
                   borderRadius: '12px',
-                  border: '1px solid #e5e7eb',
+                  border: '1px solid var(--border-color)',
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
@@ -408,7 +370,9 @@ const Dashboard = () => {
                           border: '2px solid #667eea',
                           borderRadius: '6px',
                           fontSize: '1rem',
-                          fontWeight: '600'
+                          fontWeight: '600',
+                          background: 'var(--header-bg)',
+                          color: 'var(--text-color)'
                         }}
                         autoFocus
                       />
@@ -445,15 +409,15 @@ const Dashboard = () => {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                      <h3 style={{ fontSize: '1.2rem', fontWeight: '600', color: '#1f2937', flex: 1 }}>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: '600', color: 'var(--text-color)', flex: 1 }}>
                         {analysis.name || 'Untitled Analysis'}
                       </h3>
                       <button
                         onClick={(e) => startEditName(analysis, e)}
                         style={{
                           padding: '0.4rem',
-                          background: '#f3f4f6',
-                          color: '#6b7280',
+                          background: 'var(--hover-bg)',
+                          color: 'var(--text-secondary)',
                           border: 'none',
                           borderRadius: '6px',
                           cursor: 'pointer',
@@ -473,11 +437,11 @@ const Dashboard = () => {
                         key={idx}
                         style={{
                           padding: '0.3rem 0.7rem',
-                          background: '#f3f4f6',
+                          background: 'var(--badge-bg)',
                           borderRadius: '6px',
                           fontSize: '0.85rem',
                           fontWeight: '600',
-                          color: '#374151'
+                          color: 'var(--text-color)'
                         }}
                       >
                         {company.ticker}
@@ -492,7 +456,7 @@ const Dashboard = () => {
                     <div style={{
                       width: '100%',
                       height: '8px',
-                      background: '#e5e7eb',
+                      background: 'var(--border-color)',
                       borderRadius: '4px',
                       overflow: 'hidden'
                     }}>
@@ -503,7 +467,7 @@ const Dashboard = () => {
                         transition: 'width 0.3s'
                       }} />
                     </div>
-                    <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
                       {analysis.progress}% complete
                     </p>
                   </div>
@@ -514,9 +478,9 @@ const Dashboard = () => {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   paddingTop: '1rem',
-                  borderTop: '1px solid #e5e7eb'
+                  borderTop: '1px solid var(--border-color)'
                 }}>
-                  <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                     {new Date(analysis.created_at).toLocaleDateString()}
                   </span>
                   <button
