@@ -1,0 +1,5 @@
+tunnels:
+  finexus_api:
+    addr: 3000     # or whatever port your FastAPI app runs on
+    proto: http
+    hostname: api.finexus.net

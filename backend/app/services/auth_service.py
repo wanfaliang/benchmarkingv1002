@@ -138,7 +138,7 @@ def verify_email_token(db: Session, token: str) -> User:
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid verification token"
+            detail="Invalid verification token,please request a new one or check the latest email sent to you."
         )
     
     # Check if token expired

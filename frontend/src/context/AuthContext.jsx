@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await authAPI.register(userData);
       // After registration, automatically log in
-      return await login(userData.email, userData.password);
+      return { success: true };
     } catch (error) {
       console.error('Registration error:', error.response?.data);
       return {
