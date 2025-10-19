@@ -76,7 +76,7 @@ const Header = () => {
               gap: '0.5rem'
             }}
           >
-            FinExus
+            Finexus
           </Link>
 
           {/* Desktop Navigation - ALWAYS show if authenticated */}
