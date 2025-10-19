@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';  // NEW
+import Footer from './components/Footer';  // NEW
 
 // Pages
 import Homepage from './pages/Homepage.jsx';
@@ -71,6 +72,7 @@ function App() {
             {/* Catch all - redirect to home */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
+          <Footer />  {/* NEW: Add Footer */}
 
         </Router>
       </ThemeProvider>
