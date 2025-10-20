@@ -19,6 +19,26 @@ from backend.app.report_generation.html_utils import (
     build_heatmap_table
 )
 
+def sanitize_for_json(obj):
+    """Convert numpy types to Python native types for JSON serialization."""
+    if isinstance(obj, dict):
+        return {key: sanitize_for_json(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(sanitize_for_json(item) for item in obj)
+    elif isinstance(obj, (np.integer, np.int64, np.int32, np.int16, np.int8)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32, np.float16)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return sanitize_for_json(obj.tolist())
+    elif isinstance(obj, (np.bool_, bool)):
+        return bool(obj)
+    elif pd.isna(obj):
+        return None
+    else:
+        return obj
 
 def generate(collector, analysis_id: str) -> str:
     """
@@ -1800,7 +1820,7 @@ def _create_dividend_growth_matrix(style_metrics: Dict[str, Dict]) -> str:
             ]
         }
     }
-    
+    fig_data = sanitize_for_json(fig_data)
     return build_plotly_chart(fig_data, div_id="dividend-growth-matrix", height=500)
 
 
@@ -1900,7 +1920,7 @@ def _create_style_metrics_heatmap(style_metrics: Dict[str, Dict]) -> str:
             'yaxis': {'title': ''}
         }
     }
-    
+    fig_data = sanitize_for_json(fig_data)
     return build_plotly_chart(fig_data, div_id="style-heatmap", height=500)
 
 

@@ -812,7 +812,7 @@ class FinancialDataCollection:
         return pd.DataFrame()
 
     def get_economic(self, force_refresh: bool = False, econ_dir: str = "economics",
-                     stale_days: int = 45) -> pd.DataFrame:
+                     stale_days: int = 5) -> pd.DataFrame:
         existing = self.raw_tables.get("Economic_Annual")
         if isinstance(existing, pd.DataFrame) and not existing.empty and not force_refresh:
             return existing
