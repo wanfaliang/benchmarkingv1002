@@ -1,5 +1,6 @@
 """FastAPI application entry point"""
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
@@ -94,3 +95,7 @@ def favicon():
     # (Optional) return 204 to silence logs if the file isn't there yet
     # return Response(status_code=204)
     raise HTTPException(status_code=404, detail="favicon not found")
+
+@app.exception_handler(Exception)
+async def generic_handler(request: Request, exc: Exception):
+  return JSONResponse(status_code=500, content={"detail":"Internal Server Error"})
