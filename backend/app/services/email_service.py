@@ -16,7 +16,8 @@ def send_verification_email(email: str, token: str, user_name: str = None):
     """Send verification email using Resend"""
     
     verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
-    
+    resend.api_key = settings.RESEND_API_KEY
+        
     greeting = f"Hi {user_name}," if user_name else "Hi,"
     
     html_content = f"""

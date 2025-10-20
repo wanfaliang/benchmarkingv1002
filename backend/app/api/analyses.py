@@ -181,8 +181,7 @@ def start_data_collection(
     # Start background collection
     background_tasks.add_task(
         data_collection_service.collect_data_for_analysis,
-        db, 
-        analysis
+        analysis_id
     )
     
     return {

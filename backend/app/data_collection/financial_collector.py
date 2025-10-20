@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 import glob
 import time
+import asyncio
 from datetime import datetime, date
 from typing import Dict, List, Optional, Tuple
 
@@ -85,7 +86,9 @@ class FinancialDataCollection:
         retries: int = 3,
         backoff: float = 0.7,
         export_dir: Path = Path("export"),
-        econ_dir: Path =Path("export")
+        econ_dir: Path =Path("export"),
+        websocket_manager=None,      # ← NEW
+        analysis_id: str = None        # ← NEW
     ):
         self.api_key = api_key
         self.companies = {k: (v or "").upper().strip() for k, v in companies.items()}
@@ -136,6 +139,39 @@ class FinancialDataCollection:
 
         self._collected = False
         self.availability = True
+        # NEW: WebSocket support
+        self.websocket_manager = websocket_manager
+        self.analysis_id = analysis_id
+        self._progress = 0
+
+    def __getstate__(self):
+        """Exclude WebSocket attributes from pickle"""
+        state = self.__dict__.copy()
+        # Remove unpicklable attributes
+        state['websocket_manager'] = None
+        state['analysis_id'] = None
+        return state
+    
+    def __setstate__(self, state):
+        """Restore object from pickle"""
+        self.__dict__.update(state)
+        # Ensure WebSocket attributes exist (for old pickles)
+        if not hasattr(self, 'websocket_manager'):
+            self.websocket_manager = None
+        if not hasattr(self, 'analysis_id'):
+            self.analysis_id = None
+    async def _broadcast_progress(self, progress: int, message: str):
+        """Broadcast progress via WebSocket if available"""
+        if self.websocket_manager and self.analysis_id:
+            await self.websocket_manager.broadcast_progress(
+                analysis_id=self.analysis_id,
+                progress=progress,
+                message=message,
+                status="collecting",
+                phase="A"
+            )
+        self._progress = progress
+        print(f"[{progress}%] {message}")
 
     # ---------------------------- HTTP helper ----------------------------
     def _get(self, url: str, params: dict) -> Optional[requests.Response]:
@@ -845,37 +881,72 @@ class FinancialDataCollection:
         return econ_annual
 
     # ------------------------ Orchestration ------------------------
-    def collect(self, force: bool = False):
+    async def collect(self, force: bool = False):
         if self._collected and not force:
             return
-        print("Collecting profiles ..."); self._collect_profiles()
+        await self._broadcast_progress(0, "Starting data collection...")
+        self._collect_profiles()
         if not self.availability:
             return
-        print("Collecting statements/ratios/key-metrics (annual) ..."); self._collect_statements()
-        print("Collecting enterprise values (annual history) ..."); self._collect_ev()
-        print("Collecting employee history ..."); self._collect_employees()
-        print("Collecting prices (EOD full -> monthly) ..."); self._collect_prices()
+        await self._broadcast_progress(10, "✓ Company profiles collected")
         
-        if self.include_institutional:
-            print("Collecting latest insider trading ..."); self._collect_insider_trading_latest()
-            print("Collecting institutional ownership summaries ..."); self._collect_institutional_ownership()
-            print("Collecting insider trading statistics ..."); self._collect_insider_statistics()
-        
-        if self.include_analyst:
-            print("Collecting analyst estimates & price target consensus ..."); self._collect_analyst()
-        self._collected = True
-        print("✅ Raw collection complete.")
+        await self._broadcast_progress(15, "Collecting financial statements...")
+        self._collect_statements()
+        await self._broadcast_progress(30, "✓ Financial statements collected")
 
-    def get_all_financial_data(self, force_collect: bool = False) -> pd.DataFrame:
-        self.collect(force=force_collect)
+        await self._broadcast_progress(35, "Collecting enterprise values...")
+        self._collect_ev()
+        await self._broadcast_progress(40, "✓ Enterprise values collected")
+        
+        await self._broadcast_progress(45, "Collecting employee history...")
+        self._collect_employees()
+        await self._broadcast_progress(50, "✓ Employee history collected")
+
+        await self._broadcast_progress(55, "Collecting price histories...")
+        self._collect_prices()
+        await self._broadcast_progress(70, "✓ Price histories collected")
+                
+        if self.include_institutional:
+            await self._broadcast_progress(72, "Collecting insider trading...")
+            self._collect_insider_trading_latest()
+
+            await self._broadcast_progress(77, "Collecting institutional ownership...")
+            self._collect_institutional_ownership()
+
+            await self._broadcast_progress(82, "Collecting insider statistics...")
+            self._collect_insider_statistics()
+
+            await self._broadcast_progress(85, "✓ Institutional data collected")
+        else:
+            await self._broadcast_progress(85, "Skipping institutional data collection")
+        if self.include_analyst:
+            await self._broadcast_progress(88, "Collecting analyst estimates...")
+            self._collect_analyst()
+            await self._broadcast_progress(95, "✓ Analyst estimates collected")
+        else:
+            await self._broadcast_progress(95, "Skipping analyst estimates collection")
+        
+        self._collected = True
+        await self._broadcast_progress(95, "Data collection complete.")
+        
+    async def get_all_financial_data_async(self, force_collect: bool = False) -> pd.DataFrame:
+        await self.collect(force=force_collect)
+
+        await self._broadcast_progress(96, "Building consolidated dataset...")
         if self.all_fin_df.empty:
             self._build_all_financial_data()
         return self.all_fin_df
+    
+    def get_all_financial_data(self) -> pd.DataFrame:
+
+        return self.all_fin_df
 
     # ------------------------ Export ------------------------
-    def export_excel(self, filename_base: Optional[str] = None) -> str:
+    async def export_excel(self, filename_base: Optional[str] = None) -> str:
         if not self.availability:
             return
+        
+        await self._broadcast_progress(97, "Preparing export...")
         if self.all_fin_df is None or self.all_fin_df.empty:
             raise ValueError("No data to export. Call get_all_financial_data() first.")
 
@@ -889,6 +960,8 @@ class FinancialDataCollection:
             econ_ann = self.get_economic(force_refresh=False, econ_dir = str(self.econ_dir),)
         except Exception:
             econ_ann = pd.DataFrame()
+
+        await self._broadcast_progress(99, "Writing Excel file...")
 
         with pd.ExcelWriter(str(path), engine="openpyxl") as writer:  # ← cast to str for writer
             if isinstance(econ_ann, pd.DataFrame) and not econ_ann.empty:
@@ -915,6 +988,8 @@ class FinancialDataCollection:
                     df.to_excel(writer, sheet_name=tab[:31], index=False)
 
         print(f"✅ Excel written: {path}")
+
+        await self._broadcast_progress(100, "✓ Export complete!")
         return str(path)  # ← keep return type as str
 
     # ------------------------ Convenience getters ------------------------
