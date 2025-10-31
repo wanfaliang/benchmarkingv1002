@@ -17,6 +17,12 @@ import SectionViewer from './pages/SectionViewer';
 import GoogleCallback from './pages/GoogleCallback';  // NEW
 import VerifyEmail from './pages/VerifyEmail';
 import RegistrationSuccess from './pages/RegistrationSuccess';
+import Datasets from "./pages/Datasets";
+import DatasetExplorer from "./pages/DatasetExplorer";
+import DatasetsAdmin from "./pages/DatasetAdmin";
+import CreateDataset from "./pages/CreateDataset";
+import Datahubs from './pages/Datahubs';
+import DatahubBuilder from './pages/DatahubBuilder';
 
 function App() {
   return (
@@ -68,9 +74,46 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Protected Dataset module */}
+          <Route
+            path="/datasets"
+            element={
+              <ProtectedRoute>
+                <Datasets />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/datasets/:id"
+            element={
+              <ProtectedRoute>
+                <DatasetExplorer />
+              </ProtectedRoute>
+            }
+          />
 
+          {/* Optional: role-guarded admin/tools */}
+          <Route
+            path="/admin/datasets"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <DatasetsAdmin />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/datasets/new"
+            element={
+              <ProtectedRoute>
+                <CreateDataset />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/datahubs" element={<ProtectedRoute><Datahubs /></ProtectedRoute>} />
+          <Route path="/datahubs/:id" element={<ProtectedRoute><DatahubBuilder /></ProtectedRoute>} />
             {/* Catch all - redirect to home */}
             <Route path="*" element={<Navigate to="/" />} />
+            
           </Routes>
           <Footer />  {/* NEW: Add Footer */}
 

@@ -6,12 +6,14 @@ from datetime import datetime
 from typing import Dict, Any
 
 from ..models.analysis import Analysis
+from ..models.dataset import Dataset
 from ..services.file_service import file_service
 from ..config import settings
 
 # Import Version Zero classes (we'll need to adjust import paths)
 from ..data_collection.fred_collector import FREDCollector  
-from ..data_collection.financial_collector import FinancialDataCollection
+from ..data_collection.financial_collector import FinancialDataCollection 
+from ..data_collection.dataset_collector import DatasetCollection
 from .collector_loader_service import collector_loader_service
 from ..core.websocket_manager import manager
 from ..database import SessionLocal
@@ -87,6 +89,69 @@ class DataCollectionService:
                     error=error_msg
                 )
                 
+                raise
+            
+           
+        finally:
+            db.close()
+    
+    def collect_data_for_dataset(self, dataset_id: str) -> Dict[str, Any]:
+        """Collect data for a predefined dataset using FREDCollector"""
+        db = SessionLocal()
+        try:
+            dataset: Dataset = db.query(Dataset).filter(Dataset.dataset_id == dataset_id).first()
+            
+            dataset.status = "collecting"
+            dataset.phase = "A"
+            dataset.collected_at_at = datetime.utcnow()
+            db.commit()
+            
+            try:
+                # Create directories
+                file_service.create_dataset_directory(dataset_id)
+                
+                # Convert companies list back to dictionary for DatasetCollection
+                companies_dict = {
+                    company['name']: company['ticker'] 
+                    for company in dataset.companies
+                }
+                
+                # Extract just the tickers list
+        
+            
+                dataset_collector = DatasetCollection(
+                    api_key=self.fmp_api_key,
+                    companies=companies_dict,
+                    years=dataset.years_back,
+                    export_dir=file_service.get_dataset_directory(dataset_id),
+                    econ_dir = file_service.get_shared_economic_indicators_path()
+                )
+                dataset_collector.get_all_financial_data(force_collect=True)
+                dataset_collector.export_excel()
+
+                dataset.status = "collection_complete"
+                dataset.progress = 80  # Data collection complete, next is pickling
+
+                # Save pickled collector for later use
+                collector_loader_service.save_dataset_collector(
+                collector=dataset_collector,
+                dataset_id=dataset_id
+                )
+                
+                # Update analysis status
+                dataset.status = "ready"
+                dataset.progress = 100  # Phase A complete
+                db.commit()
+              
+               
+            except Exception as e:
+                error_msg = str(e)
+                print(f"❌ Data collection failed: {error_msg}")
+                
+                dataset.status = "failed"
+                dataset.error_log = f"Collection failed: {error_msg}"
+                db.commit()
+
                 raise
             
            

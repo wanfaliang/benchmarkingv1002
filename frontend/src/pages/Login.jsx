@@ -1,7 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import GoogleLoginButton from '../components/GoogleLoginButton';  // NEW
+import GoogleLoginButton from '../components/GoogleLoginButton';
+import { ArrowLeft, Mail, Lock, AlertCircle, Sparkles } from 'lucide-react';
+
+/**
+ * Login.jsx - Professional Login Page
+ * 
+ * Features:
+ * - Modern card-based design
+ * - Google OAuth integration
+ * - Beautiful error handling
+ * - Responsive layout
+ * - Tailwind CSS styling
+ */
+
+function cls(...classes) {
+  return classes.filter(Boolean).join(" ");
+}
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -43,141 +59,163 @@ const Login = () => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '20px'
-    }}>
-      <div style={{
-        background: 'white',
-        padding: '3rem',
-        borderRadius: '16px',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-        width: '100%',
-        maxWidth: '450px'
-      }}>
-        <h1 style={{
-          fontSize: '2rem',
-          fontWeight: 'bold',
-          marginBottom: '0.5rem',
-          color: '#1f2937',
-          textAlign: 'center'
-        }}>
-          Welcome Back
-        </h1>
-        <p style={{
-          color: '#6b7280',
-          textAlign: 'center',
-          marginBottom: '2rem'
-        }}>
-          Sign in to your account
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30 flex items-center justify-center p-4">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-40">
+        <div className="absolute inset-0" style={{
+          backgroundImage: 'radial-gradient(circle at 2px 2px, rgb(148 163 184) 1px, transparent 0)',
+          backgroundSize: '40px 40px'
+        }}></div>
+      </div>
 
-        {error && (
-          <div style={{
-            background: '#fee2e2',
-            color: '#dc2626',
-            padding: '1rem',
-            borderRadius: '8px',
-            marginBottom: '1.5rem',
-            fontSize: '0.9rem'
-          }}>
-            {error}
+      {/* Gradient Orbs */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-200/40 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-200/40 rounded-full blur-3xl"></div>
+
+      {/* Login Card */}
+      <div className="relative w-full max-w-md">
+        {/* Back to Home Link */}
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors mb-6"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to home
+        </Link>
+
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 text-white mb-4">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+              Welcome Back
+            </h1>
+            <p className="text-slate-600">
+              Sign in to your account to continue
+            </p>
           </div>
-        )}
 
-        {/* NEW: Google Sign-In Button */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <GoogleLoginButton />
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">{error}</div>
+            </div>
+          )}
+
+          {/* Google Sign-In */}
+          <div className="mb-6">
+            <GoogleLoginButton />
+          </div>
+
+          {/* Divider */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white text-slate-500">
+                or continue with email
+              </span>
+            </div>
+          </div>
+
+          {/* Login Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Email Field */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Email Address
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="w-5 h-5 text-slate-400" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="w-5 h-5 text-slate-400" />
+                </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Forgot Password Link */}
+            <div className="flex items-center justify-end">
+              <button
+                type="button"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className={cls(
+                "w-full py-3 px-4 rounded-xl font-semibold text-white transition-all shadow-lg",
+                loading
+                  ? "bg-slate-400 cursor-not-allowed"
+                  : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:shadow-xl"
+              )}
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+
+          {/* Sign Up Link */}
+          <div className="mt-6 text-center">
+            <p className="text-slate-600 text-sm">
+              Don't have an account?{' '}
+              <Link
+                to="/register"
+                className="text-blue-600 hover:text-blue-700 font-semibold transition-colors"
+              >
+                Sign up
+              </Link>
+            </p>
+          </div>
         </div>
 
-        {/* NEW: Divider */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          margin: '1.5rem 0'
-        }}>
-          <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }}></div>
-          <span style={{ padding: '0 1rem', color: '#6b7280', fontSize: '0.9rem' }}>
-            or continue with email
-          </span>
-          <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }}></div>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Email</label>
-            <input
-              type="email"
-              className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input
-              type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '1rem',
-              background: loading ? '#9ca3af' : '#667eea',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '1rem',
-              fontWeight: '600',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'background 0.2s'
-            }}
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-
-        <p style={{
-          textAlign: 'center',
-          marginTop: '1.5rem',
-          color: '#6b7280'
-        }}>
-          Don't have an account?{' '}
-          <Link to="/register" style={{
-            color: '#667eea',
-            textDecoration: 'none',
-            fontWeight: '600'
-          }}>
-            Sign up
-          </Link>
-        </p>
-
-        <div style={{
-          textAlign: 'center',
-          marginTop: '1.5rem'
-        }}>
-          <Link to="/" style={{
-            color: '#6b7280',
-            textDecoration: 'none',
-            fontSize: '0.9rem'
-          }}>
-            ← Back to home
-          </Link>
+        {/* Footer Help Text */}
+        <div className="mt-6 text-center">
+          <p className="text-sm text-slate-600">
+            By signing in, you agree to our{' '}
+            <button className="text-blue-600 hover:text-blue-700 font-medium">
+              Terms of Service
+            </button>
+            {' '}and{' '}
+            <button className="text-blue-600 hover:text-blue-700 font-medium">
+              Privacy Policy
+            </button>
+          </p>
         </div>
       </div>
     </div>

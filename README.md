@@ -1,6 +1,11 @@
-Financial Analysis Platform 
-I am going to build a web-based application for financial and equity analysis and modeling based on the application (Version Zero) I built which can create financial and equity analysis and modeling and comprehensive Word format reports. 
-The idea is to convert the output in the format of Word document into interactive web interface while keeping the features and functionalities of Version Zero.
+Notes to the Commits
+1. The Commit on Oct 20, 2025, which FinancialDataCollection and related service to connect to websocket,Fix email verification service, modify localhost to domain and the email_service.py.
+
+Please note that this version failed to create effective socket, will be fixed in later version. The useWebSocket.js is to be fixed.
+
+Introducing Financial Analysis Module
+This is the first moduel of finexus.net
+
 1. Introduction of Version Zero:
 Data infrastructure of Version Zero
 FREDCollector

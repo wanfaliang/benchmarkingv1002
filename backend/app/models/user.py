@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 
+
 from ..database import Base
 
 def generate_uuid():
@@ -31,3 +32,7 @@ class User(Base):
     
     # Relationship
     analyses = relationship("Analysis", back_populates="user", cascade="all, delete-orphan")
+    # Add these relationships:
+    datasets = relationship("Dataset", back_populates="owner", foreign_keys="Dataset.user_id")
+    dashboards = relationship("Dashboard", back_populates="user")
+    saved_queries = relationship("SavedQuery", back_populates="user")

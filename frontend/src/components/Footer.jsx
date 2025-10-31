@@ -2,18 +2,39 @@ import React from "react";
 
 export default function Footer() {
   const year = new Date().getFullYear();
+
   return (
-    <footer style={{
-      padding: "1rem",
-      textAlign: "center",
-      fontSize: "14px",
-      opacity: 0.8,
-      borderTop: "1px solid #e0e0e0",
-      marginTop: "2rem"
-    }}>
-      <a href="/privacy-policy.html" style={{ margin: "0 0.5rem" }}>Privacy Policy</a> ·
-      <a href="/terms-of-service.html" style={{ margin: "0 0.5rem" }}>Terms of Service</a>
-      <div style={{ marginTop: "0.5rem" }}>© {year} Finexus</div>
+    <footer
+      className="
+        w-full
+        border-t border-slate-300
+        bg-slate-50
+        text-slate-600
+        text-sm
+        mt-8
+        px-4 py-4
+        text-center
+      "
+    >
+      <div className="space-x-2">
+        <a
+          href="/privacy-policy.html"
+          className="hover:text-slate-900 underline-offset-2 hover:underline"
+        >
+          Privacy Policy
+        </a>
+        <span className="text-slate-400">·</span>
+        <a
+          href="/terms-of-service.html"
+          className="hover:text-slate-900 underline-offset-2 hover:underline"
+        >
+          Terms of Service
+        </a>
+      </div>
+
+      <div className="text-slate-500 mt-2">
+        © {year} Finexus
+      </div>
     </footer>
   );
 }

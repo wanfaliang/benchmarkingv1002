@@ -2,6 +2,22 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserMenu from './UserMenu';
+import { Menu, X, Sparkles, TrendingUp } from 'lucide-react';
+
+/**
+ * Header.jsx - Professional Navigation Header
+ * 
+ * Features:
+ * - Beautiful FinExus logo with icon
+ * - Responsive navigation
+ * - Mobile menu with smooth transitions
+ * - Active state indicators
+ * - User menu integration
+ */
+
+function cls(...classes) {
+  return classes.filter(Boolean).join(" ");
+}
 
 const Header = () => {
   const { isAuthenticated } = useAuth();
@@ -13,7 +29,8 @@ const Header = () => {
     { label: 'Financial Analysis', path: '/dashboard' },
     { label: 'Trading Research', path: '/trading' },
     { label: 'Portfolio', path: '/portfolio' },
-    { label: 'Data', path: '/data' },
+    { label: 'Datasets', path: '/datasets' },
+    { label: 'Datahub', path: '/datahubs' },
     { label: 'News', path: '/news' },
     { label: 'About', path: '/about' },
   ];
@@ -24,176 +41,114 @@ const Header = () => {
   }
 
   return (
-    <header style={{
-      background: 'var(--header-bg)',
-      borderBottom: '1px solid var(--border-color)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 100,
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-    }}>
-      <div style={{
-        maxWidth: '1400px',
-        margin: '0 auto',
-        padding: '0 1.5rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        height: '64px'
-      }}>
-        {/* Left: Logo + Nav (Desktop) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          {/* Mobile Hamburger */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            style={{
-              display: 'none',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.5rem',
-              color: 'var(--text-color)'
-            }}
-            className="mobile-hamburger"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M3 12h18M3 6h18M3 18h18" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-
-          {/* Logo */}
-          <Link 
-            to={isAuthenticated ? "/dashboard" : "/"}
-            style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              textDecoration: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            Finexus
-          </Link>
-
-          {/* Desktop Navigation - ALWAYS show if authenticated */}
-          {isAuthenticated && (
-            <nav style={{ display: 'flex', gap: '0.5rem' }} className="desktop-nav">
-              {navItems.map((item) => {
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '6px',
-                      textDecoration: 'none',
-                      color: isActive ? 'var(--primary-color)' : 'var(--text-secondary)',
-                      fontWeight: isActive ? '600' : '500',
-                      fontSize: '0.95rem',
-                      transition: 'all 0.2s',
-                      background: isActive ? 'var(--active-bg)' : 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isActive) e.currentTarget.style.background = 'var(--hover-bg)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          )}
-        </div>
-
-        {/* Right: User Menu or Login Button */}
-        <div>
-          {isAuthenticated ? (
-            <UserMenu />
-          ) : (
+    <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm backdrop-blur-sm bg-white/95">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Left: Logo + Nav */}
+          <div className="flex items-center gap-8">
+            {/* Mobile Hamburger */}
             <button
-              onClick={() => navigate('/login')}
-              style={{
-                padding: '0.625rem 1.5rem',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '0.95rem',
-                cursor: 'pointer',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)';
-              }}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-700"
             >
-              Sign In
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
             </button>
-          )}
+
+            {/* Logo */}
+            <Link 
+              to={isAuthenticated ? "/dashboard" : "/"}
+              className="flex items-center gap-2.5 group"
+            >
+              {/* Logo Icon */}
+              <div className="relative">
+                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
+                  <TrendingUp className="w-5 h-5 text-white" strokeWidth={2.5} />
+                </div>
+                <div className="absolute -top-1 -right-1 w-3 h-3">
+                  <Sparkles className="w-3 h-3 text-amber-400 animate-pulse" />
+                </div>
+              </div>
+              
+              {/* Logo Text */}
+              <div className="flex flex-col">
+                <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-none">
+                  FinExus
+                </span>
+                <span className="text-[10px] text-slate-500 font-medium tracking-wider uppercase leading-none mt-0.5">
+                  Financial Intelligence
+                </span>
+              </div>
+            </Link>
+
+            {/* Desktop Navigation */}
+            {isAuthenticated && (
+              <nav className="hidden lg:flex items-center gap-1">
+                {navItems.map((item) => {
+                  const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={cls(
+                        "px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                        isActive
+                          ? "bg-slate-100 text-slate-900"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                      )}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+            )}
+          </div>
+
+          {/* Right: User Menu or Login Button */}
+          <div>
+            {isAuthenticated ? (
+              <UserMenu />
+            ) : (
+              <button
+                onClick={() => navigate('/login')}
+                className="px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold text-sm hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-md"
+              >
+                Sign In
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Mobile Navigation Menu */}
       {mobileMenuOpen && isAuthenticated && (
-        <div style={{
-          background: 'var(--dropdown-bg)',
-          borderTop: '1px solid var(--border-color)',
-          padding: '1rem'
-        }} className="mobile-nav">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={() => setMobileMenuOpen(false)}
-                style={{
-                  display: 'block',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '6px',
-                  textDecoration: 'none',
-                  color: isActive ? 'var(--primary-color)' : 'var(--text-color)',
-                  fontWeight: isActive ? '600' : '500',
-                  background: isActive ? 'var(--active-bg)' : 'transparent',
-                  marginBottom: '0.25rem'
-                }}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+        <div className="lg:hidden border-t border-slate-200 bg-white shadow-lg">
+          <nav className="px-4 py-3 space-y-1">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cls(
+                    "block px-4 py-3 rounded-lg text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-slate-100 text-slate-900"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
       )}
-
-      <style>{`
-        @media (max-width: 768px) {
-          .desktop-nav {
-            display: none !important;
-          }
-          .mobile-hamburger {
-            display: block !important;
-          }
-        }
-        @media (min-width: 769px) {
-          .mobile-nav {
-            display: none !important;
-          }
-        }
-      `}</style>
     </header>
   );
 };

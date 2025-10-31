@@ -1,107 +1,267 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="h-full bg-slate-50">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Finexus – Terms of Service</title>
   <meta name="description" content="Finexus Terms of Service">
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; color: #111; }
-    header { background: #0b3d2e; color: #fff; padding: 2.5rem 1.25rem; }
-    main { max-width: 900px; margin: 0 auto; padding: 2rem 1.25rem; }
-    h1, h2, h3 { line-height: 1.25; }
-    h2 { margin-top: 2rem; }
-    a { color: #0b7d5c; }
-    .muted { color: #666; }
-    .card { background:#f7f7f7; border-radius: 12px; padding: 1rem 1.25rem; }
-    footer { border-top: 1px solid #eee; padding: 2rem 1.25rem; text-align: center; color:#555; }
-    ul { padding-left: 1.25rem; }
-    code { background:#f2f2f2; padding:0.1rem 0.3rem; border-radius:4px; }
-  </style>
+
+  <!-- assumes your Tailwind build is loaded globally in the app -->
 </head>
-<body>
-  <header>
-    <h1>Terms of Service</h1>
-    <p class="muted">Last updated: October 19, 2025</p>
-  </header>
-  <main>
-    <div class="card">
-      <p>
-        These Terms of Service (“Terms”) govern your access to and use of the websites, applications, and services
-        provided by <strong>Finexus</strong> (the “Service”). By accessing or using the Service, you agree to be bound by these Terms.
-        If you do not agree, do not use the Service.
-      </p>
+<body class="min-h-full text-slate-700 antialiased flex flex-col">
+  <!-- Header stripe -->
+  <header class="bg-slate-900 text-white px-6 py-10 shadow-sm">
+    <div class="max-w-4xl mx-auto">
+      <h1 class="text-3xl font-bold tracking-tight text-white">Terms of Service</h1>
+      <p class="text-slate-300 text-sm mt-2">Last updated: October 19, 2025</p>
     </div>
+  </header>
 
-    <h2 id="eligibility">1. Eligibility & Accounts</h2>
-    <ul>
-      <li>You must be legally capable of entering into a binding agreement in your jurisdiction.</li>
-      <li>Account creation/sign-in uses <strong>Google OAuth</strong>. You are responsible for maintaining the confidentiality of your account and for all activities that occur under it.</li>
-    </ul>
+  <!-- Main content card -->
+  <main class="flex-1 px-6 py-10">
+    <article class="max-w-4xl mx-auto space-y-10">
+      <!-- Intro card -->
+      <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p class="text-slate-700 text-base leading-relaxed">
+          These Terms of Service (“Terms”) govern your access to and use of the websites,
+          applications, and services provided by
+          <strong class="text-slate-900">Finexus</strong>
+          (the “Service”). By accessing or using the Service, you agree to be bound by these
+          Terms. If you do not agree, do not use the Service.
+        </p>
+      </section>
 
-    <h2 id="license">2. License & Access</h2>
-    <p>Subject to these Terms, we grant you a limited, non-exclusive, non-transferable license to access and use the Service for your internal purposes. We reserve all rights not expressly granted to you.</p>
+      <section class="space-y-4">
+        <h2 id="eligibility" class="text-xl font-semibold text-slate-900 tracking-tight">
+          1. Eligibility &amp; Accounts
+        </h2>
+        <ul class="list-disc pl-5 space-y-2 text-base leading-relaxed">
+          <li>You must be legally capable of entering into a binding agreement in your jurisdiction.</li>
+          <li>
+            Account creation/sign-in uses <strong class="text-slate-900">Google OAuth</strong>.
+            You are responsible for maintaining the confidentiality of your account and
+            for all activities that occur under it.
+          </li>
+        </ul>
+      </section>
 
-    <h2 id="acceptable-use">3. Acceptable Use</h2>
-    <ul>
-      <li>Do not misuse the Service, interfere with its normal operation, or access it using methods other than the interface and instructions we provide.</li>
-      <li>No attempts to copy, reverse engineer, or create derivative works from the Service except as permitted by law.</li>
-      <li>No use of the Service for unlawful, harmful, or abusive activities, including violating intellectual property or privacy rights.</li>
-    </ul>
+      <section class="space-y-4">
+        <h2 id="license" class="text-xl font-semibold text-slate-900 tracking-tight">
+          2. License &amp; Access
+        </h2>
+        <p class="text-base leading-relaxed">
+          Subject to these Terms, we grant you a limited, non-exclusive, non-transferable
+          license to access and use the Service for your internal purposes. We reserve all
+          rights not expressly granted to you.
+        </p>
+      </section>
 
-    <h2 id="user-content">4. Your Content</h2>
-    <ul>
-      <li>You retain ownership of content you submit to the Service. You grant us a limited license to host, store, process, transmit, and display that content as necessary to operate and improve the Service.</li>
-      <li>You represent that you have the rights and permissions necessary for the content you submit.</li>
-    </ul>
+      <section class="space-y-4">
+        <h2 id="acceptable-use" class="text-xl font-semibold text-slate-900 tracking-tight">
+          3. Acceptable Use
+        </h2>
+        <ul class="list-disc pl-5 space-y-2 text-base leading-relaxed">
+          <li>
+            Do not misuse the Service, interfere with its normal operation,
+            or access it using methods other than the interface and instructions we provide.
+          </li>
+          <li>
+            No attempts to copy, reverse engineer, or create derivative works from the Service
+            except as permitted by law.
+          </li>
+          <li>
+            No use of the Service for unlawful, harmful, or abusive activities,
+            including violating intellectual property or privacy rights.
+          </li>
+        </ul>
+      </section>
 
-    <h2 id="privacy">5. Privacy</h2>
-    <p>Your use of the Service is also governed by our <a href="/privacy-policy.html">Privacy Policy</a>, which explains how we collect and use personal information.</p>
+      <section class="space-y-4">
+        <h2 id="user-content" class="text-xl font-semibold text-slate-900 tracking-tight">
+          4. Your Content
+        </h2>
+        <ul class="list-disc pl-5 space-y-2 text-base leading-relaxed">
+          <li>
+            You retain ownership of content you submit to the Service.
+            You grant us a limited license to host, store, process, transmit,
+            and display that content as necessary to operate and improve the Service.
+          </li>
+          <li>
+            You represent that you have the rights and permissions necessary
+            for the content you submit.
+          </li>
+        </ul>
+      </section>
 
-    <h2 id="third-parties">6. Third-Party Services & Scopes</h2>
-    <p>The Service may integrate with third-party services (e.g., Google APIs). Your use of those services is governed by their terms and policies. If you authorize additional Google OAuth scopes (including sensitive or restricted scopes), you do so to enable the corresponding functionality within the Service.</p>
+      <section class="space-y-4">
+        <h2 id="privacy" class="text-xl font-semibold text-slate-900 tracking-tight">
+          5. Privacy
+        </h2>
+        <p class="text-base leading-relaxed">
+          Your use of the Service is also governed by our
+          <a href="/privacy-policy.html"
+             class="text-slate-900 underline underline-offset-2 hover:text-black">
+            Privacy Policy
+          </a>,
+          which explains how we collect and use personal information.
+        </p>
+      </section>
 
-    <h2 id="disclaimers">7. No Professional Advice</h2>
-    <p>For any analytics, insights, forecasts, or other outputs, the Service provides information “as-is” for educational or informational purposes only and <strong>does not constitute financial, investment, legal, or tax advice</strong>. You are responsible for your decisions.</p>
+      <section class="space-y-4">
+        <h2 id="third-parties" class="text-xl font-semibold text-slate-900 tracking-tight">
+          6. Third-Party Services &amp; Scopes
+        </h2>
+        <p class="text-base leading-relaxed">
+          The Service may integrate with third-party services (e.g., Google APIs).
+          Your use of those services is governed by their terms and policies.
+          If you authorize additional Google OAuth scopes (including sensitive or restricted scopes),
+          you do so to enable the corresponding functionality within the Service.
+        </p>
+      </section>
 
-    <h2 id="fees">8. Fees (if applicable)</h2>
-    <p>If we offer paid features or plans, fees, billing periods, and renewal terms will be presented at the point of purchase. Taxes may apply.</p>
+      <section class="space-y-4">
+        <h2 id="disclaimers" class="text-xl font-semibold text-slate-900 tracking-tight">
+          7. No Professional Advice
+        </h2>
+        <p class="text-base leading-relaxed">
+          For any analytics, insights, forecasts, or other outputs,
+          the Service provides information “as-is” for educational or informational purposes only
+          and <strong class="text-slate-900">does not constitute financial, investment, legal, or tax advice</strong>.
+          You are responsible for your decisions.
+        </p>
+      </section>
 
-    <h2 id="termination">9. Termination</h2>
-    <p>We may suspend or terminate your access to the Service for conduct that violates these Terms or creates risk of harm. You may stop using the Service at any time.</p>
+      <section class="space-y-4">
+        <h2 id="fees" class="text-xl font-semibold text-slate-900 tracking-tight">
+          8. Fees (if applicable)
+        </h2>
+        <p class="text-base leading-relaxed">
+          If we offer paid features or plans, fees, billing periods, and renewal terms will be
+          presented at the point of purchase. Taxes may apply.
+        </p>
+      </section>
 
-    <h2 id="warranties">10. Disclaimers</h2>
-    <p>The Service is provided on an <strong>“AS IS” and “AS AVAILABLE”</strong> basis, without warranties of any kind, whether express, implied, or statutory, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement.</p>
+      <section class="space-y-4">
+        <h2 id="termination" class="text-xl font-semibold text-slate-900 tracking-tight">
+          9. Termination
+        </h2>
+        <p class="text-base leading-relaxed">
+          We may suspend or terminate your access to the Service for conduct that violates
+          these Terms or creates risk of harm. You may stop using the Service at any time.
+        </p>
+      </section>
 
-    <h2 id="liability">11. Limitation of Liability</h2>
-    <p>To the maximum extent permitted by law, Finexus and its affiliates will not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly, or any loss of data, use, goodwill, or other intangible losses, resulting from (a) your use or inability to use the Service; (b) any conduct or content of any third party; or (c) unauthorized access, use, or alteration of your transmissions or content.</p>
+      <section class="space-y-4">
+        <h2 id="warranties" class="text-xl font-semibold text-slate-900 tracking-tight">
+          10. Disclaimers
+        </h2>
+        <p class="text-base leading-relaxed">
+          The Service is provided on an
+          <strong class="text-slate-900">“AS IS” and “AS AVAILABLE”</strong> basis,
+          without warranties of any kind, whether express, implied, or statutory,
+          including implied warranties of merchantability, fitness for a particular purpose,
+          and non-infringement.
+        </p>
+      </section>
 
-    <h2 id="indemnity">12. Indemnification</h2>
-    <p>You agree to indemnify and hold harmless Finexus and its affiliates, officers, agents, and employees from any claims, liabilities, damages, losses, and expenses, including reasonable attorney fees, arising out of or in any way connected with your violation of these Terms or your misuse of the Service.</p>
+      <section class="space-y-4">
+        <h2 id="liability" class="text-xl font-semibold text-slate-900 tracking-tight">
+          11. Limitation of Liability
+        </h2>
+        <p class="text-base leading-relaxed">
+          To the maximum extent permitted by law, Finexus and its affiliates will not be liable
+          for any indirect, incidental, special, consequential, or punitive damages, or any loss
+          of profits or revenues, whether incurred directly or indirectly, or any loss of data,
+          use, goodwill, or other intangible losses, resulting from
+          (a) your use or inability to use the Service;
+          (b) any conduct or content of any third party; or
+          (c) unauthorized access, use, or alteration of your transmissions or content.
+        </p>
+      </section>
 
-    <h2 id="law">13. Governing Law; Disputes</h2>
-    <p>These Terms are governed by the laws of the State of California, without regard to conflicts of law principles. Any disputes will be resolved in the courts located in Orange County, California, unless otherwise required by law.</p>
+      <section class="space-y-4">
+        <h2 id="indemnity" class="text-xl font-semibold text-slate-900 tracking-tight">
+          12. Indemnification
+        </h2>
+        <p class="text-base leading-relaxed">
+          You agree to indemnify and hold harmless Finexus and its affiliates, officers, agents,
+          and employees from any claims, liabilities, damages, losses, and expenses, including
+          reasonable attorney fees, arising out of or in any way connected with your violation
+          of these Terms or your misuse of the Service.
+        </p>
+      </section>
 
-    <h2 id="changes">14. Changes to the Service and Terms</h2>
-    <p>We may modify the Service and these Terms from time to time. If changes are material, we will provide reasonable notice (e.g., via the Service or email). The “Last updated” date reflects the most recent changes. By continuing to use the Service after changes become effective, you agree to the revised Terms.</p>
+      <section class="space-y-4">
+        <h2 id="law" class="text-xl font-semibold text-slate-900 tracking-tight">
+          13. Governing Law; Disputes
+        </h2>
+        <p class="text-base leading-relaxed">
+          These Terms are governed by the laws of the State of California, without regard to
+          conflicts of law principles. Any disputes will be resolved in the courts located in
+          Orange County, California, unless otherwise required by law.
+        </p>
+      </section>
 
-    <h2 id="contact">15. Contact</h2>
-    <p>Email us at <a href="mailto:support@finexus.net">support@finexus.net</a> with any questions about these Terms.</p>
+      <section class="space-y-4">
+        <h2 id="changes" class="text-xl font-semibold text-slate-900 tracking-tight">
+          14. Changes to the Service and Terms
+        </h2>
+        <p class="text-base leading-relaxed">
+          We may modify the Service and these Terms from time to time. If changes are material,
+          we will provide reasonable notice (e.g., via the Service or email). The “Last updated”
+          date reflects the most recent changes. By continuing to use the Service after changes
+          become effective, you agree to the revised Terms.
+        </p>
+      </section>
 
-    <h2 id="beta-disclaimer">16. Beta Stage Disclaimer</h2>
-    <p>
-      Finexus is provided as a beta version for early users and testers. Features
-      may change, be added, or removed without notice. While we strive to maintain
-      service stability and data integrity, the beta nature of the platform means
-      that occasional interruptions or incomplete features may occur. By using
-      Finexus during this stage, you acknowledge that certain functionalities are
-      experimental and agree to provide feedback to help us improve. Your continued
-      use signifies acceptance of these conditions and all other terms outlined
-      above.
-    </p>
+      <section class="space-y-4">
+        <h2 id="contact" class="text-xl font-semibold text-slate-900 tracking-tight">
+          15. Contact
+        </h2>
+        <p class="text-base leading-relaxed">
+          Email us at
+          <a href="mailto:support@finexus.net"
+             class="text-slate-900 underline underline-offset-2 hover:text-black">
+            support@finexus.net
+          </a>
+          with any questions about these Terms.
+        </p>
+      </section>
+
+      <section class="space-y-4">
+        <h2 id="beta-disclaimer" class="text-xl font-semibold text-slate-900 tracking-tight">
+          16. Beta Stage Disclaimer
+        </h2>
+        <p class="text-base leading-relaxed">
+          Finexus is provided as a beta version for early users and testers.
+          Features may change, be added, or removed without notice. While we strive to
+          maintain service stability and data integrity, the beta nature of the platform
+          means that occasional interruptions or incomplete features may occur.
+          By using Finexus during this stage, you acknowledge that certain functionalities
+          are experimental and agree to provide feedback to help us improve.
+          Your continued use signifies acceptance of these conditions and all other
+          terms outlined above.
+        </p>
+      </section>
+    </article>
   </main>
-  <footer>
-    &copy; 2025 Finexus. All rights reserved.
+
+  <!-- Footer (match app footer style update) -->
+  <footer class="border-t border-slate-300 bg-slate-50 text-slate-600 text-sm text-center px-4 py-6">
+    <div class="space-x-2">
+      <a href="/privacy-policy.html"
+         class="hover:text-slate-900 underline-offset-2 hover:underline">
+        Privacy Policy
+      </a>
+      <span class="text-slate-400">·</span>
+      <a href="/terms-of-service.html"
+         class="hover:text-slate-900 underline-offset-2 hover:underline">
+        Terms of Service
+      </a>
+    </div>
+    <div class="text-slate-500 mt-2">
+      © 2025 Finexus. All rights reserved.
+    </div>
   </footer>
 </body>
 </html>

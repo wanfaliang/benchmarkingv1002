@@ -1,10 +1,13 @@
 """FastAPI application entry point"""
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request,status, Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.openapi.docs import get_swagger_ui_html
+
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-
-from .api import auth, tickers, analyses, websocket
+import secrets
+from .api import auth, tickers, analyses, websocket, datasets
 from .config import settings
 
 import logging
@@ -24,6 +27,7 @@ logging.basicConfig(
     ]
 )
 
+
 logger = logging.getLogger(__name__)
 
 # Create FastAPI app
@@ -31,8 +35,12 @@ app = FastAPI(
     title="Financial Analysis Platform",
     description="Web-based financial analysis and reporting platform",
     version="1.0.0",
-    debug=settings.DEBUG
+    debug=settings.DEBUG,
+    docs_url=None, redoc_url=None
 )
+security = HTTPBasic()
+DOCS_USERNAME = "admin"
+DOCS_PASSWORD = settings.DOCS_PASSWORD
 
 # CORS middleware
 app.add_middleware(
@@ -48,7 +56,31 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(tickers.router)
 app.include_router(analyses.router)
-app.include_router(websocket.router)  # ← Add this line
+app.include_router(websocket.router)
+app.include_router(datasets.router)
+
+def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
+    """
+    Compares the provided credentials with the secure ones.
+    """
+    correct_username = secrets.compare_digest(credentials.username, DOCS_USERNAME)
+    correct_password = secrets.compare_digest(credentials.password, DOCS_PASSWORD)
+
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+@app.get("/docs", include_in_schema=False)
+async def get_documentation(username: str = Depends(get_current_username)):
+    """
+    Serves the protected Swagger UI.
+    """
+    return get_swagger_ui_html(openapi_url=app.openapi_url, title=app.title + " - Swagger UI")
+
 
 @app.get("/")
 def root():

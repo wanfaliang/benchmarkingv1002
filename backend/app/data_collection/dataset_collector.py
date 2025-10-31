@@ -4,7 +4,6 @@ import re
 from pathlib import Path
 import glob
 import time
-import asyncio
 from datetime import datetime, date
 from typing import Dict, List, Optional, Tuple
 
@@ -17,40 +16,11 @@ def _ensure_dir(p: str) -> None:
     os.makedirs(p, exist_ok=True)
 
 
-def _safe_float(x, default=np.nan):
-    try:
-        if x is None:
-            return default
-        if isinstance(x, str):
-            s = x.replace(",", "").strip()
-            if s == "" or s.lower() in ("nan", "null", "none"):
-                return default
-            return float(s)
-        return float(x)
-    except Exception:
-        return default
-
-
-class FinancialDataCollection:
+class DatasetCollection:
     """
-    V3 (Enhanced):
-      - Collects profiles, IS/BS/CF (annual), ratios (annual), key metrics (annual)
-      - EV history (annual): marketCapitalization, enterpriseValue, addTotalDebt, minusCashAndCashEquivalents
-      - Employee history (annual by periodOfReport)
-      - Prices (EOD full) with explicit ?from=YYYY-MM-DD covering (years+1) back; preserves API columns exactly.
-        -> Monthly resample (export-only) uses "last" per month for *all* columns when possible (no column guessing).
-      - S&P 500 index prices (^GSPC) collected for the same time period
-      - Analyst: analyst-estimates (annual), price-target-consensus (export-only)
-      - NEW: Institutional & Insider Activity:
-        * Latest insider trading activity
-        * Institutional ownership summaries
-        * Insider trading statistics
-        * 13F extract capability (separate method)
-      - All_Financial_Data keeps ALL original fields from the five accounting/metric blocks;
-        collisions resolved by precedence (later overwrites earlier).
-      - Adds absolute YoY deltas for a set of key numeric indicators as <col>_YoY (no %).
-      - Economic indicators: load latest economics/fred_full_history_YYYYMMDD_HHMM.xlsx;
-        if missing/stale, calls FREDCollector to build a new workbook. Exports Economic_Annual sheet.
+    The following is borrowed and adapted from FinancialDataCollection, with additional features:
+    Reference to FinancialDataCollection for details unless explicitly noted below.
+    Enhanced to include:
     """
 
     ENDPOINTS = {
@@ -86,9 +56,7 @@ class FinancialDataCollection:
         retries: int = 3,
         backoff: float = 0.7,
         export_dir: Path = Path("export"),
-        econ_dir: Path =Path("export"),
-        websocket_manager=None,      # ← NEW
-        analysis_id: str = None        # ← NEW
+        econ_dir: Path =Path("export")
     ):
         self.api_key = api_key
         self.companies = {k: (v or "").upper().strip() for k, v in companies.items()}
@@ -139,39 +107,6 @@ class FinancialDataCollection:
 
         self._collected = False
         self.availability = True
-        # NEW: WebSocket support
-        self.websocket_manager = websocket_manager
-        self.analysis_id = analysis_id
-        self._progress = 0
-
-    def __getstate__(self):
-        """Exclude WebSocket attributes from pickle"""
-        state = self.__dict__.copy()
-        # Remove unpicklable attributes
-        state['websocket_manager'] = None
-        state['analysis_id'] = None
-        return state
-    
-    def __setstate__(self, state):
-        """Restore object from pickle"""
-        self.__dict__.update(state)
-        # Ensure WebSocket attributes exist (for old pickles)
-        if not hasattr(self, 'websocket_manager'):
-            self.websocket_manager = None
-        if not hasattr(self, 'analysis_id'):
-            self.analysis_id = None
-    async def _broadcast_progress(self, progress: int, message: str):
-        """Broadcast progress via WebSocket if available"""
-        if self.websocket_manager and self.analysis_id:
-            await self.websocket_manager.broadcast_progress(
-                analysis_id=self.analysis_id,
-                progress=progress,
-                message=message,
-                status="collecting",
-                phase="A"
-            )
-        self._progress = progress
-        print(f"[{progress}%] {message}")
 
     # ---------------------------- HTTP helper ----------------------------
     def _get(self, url: str, params: dict) -> Optional[requests.Response]:
@@ -209,7 +144,12 @@ class FinancialDataCollection:
         except Exception:
             return None
 
-
+    def _firstword_key(self, name: str, ticker: str) -> str:
+        m = re.search(r"[A-Za-z0-9]+", name or "")
+        head = m.group(0) if m else ""
+        if not head:
+            head = ticker or "CO"
+        return f"{head}_{(ticker or '').upper()}"
 
     # ------------------------ Collection ------------------------
     def _collect_profiles(self):
@@ -873,72 +813,37 @@ class FinancialDataCollection:
         return econ_annual
 
     # ------------------------ Orchestration ------------------------
-    async def collect(self, force: bool = False):
+    def collect(self, force: bool = False):
         if self._collected and not force:
             return
-        await self._broadcast_progress(0, "Starting data collection...")
-        self._collect_profiles()
+        print("Collecting profiles ..."); self._collect_profiles()
         if not self.availability:
             return
-        await self._broadcast_progress(10, "✓ Company profiles collected")
+        print("Collecting statements/ratios/key-metrics (annual) ..."); self._collect_statements()
+        print("Collecting enterprise values (annual history) ..."); self._collect_ev()
+        print("Collecting employee history ..."); self._collect_employees()
+        print("Collecting prices (EOD full -> monthly) ..."); self._collect_prices()
         
-        await self._broadcast_progress(15, "Collecting financial statements...")
-        self._collect_statements()
-        await self._broadcast_progress(30, "✓ Financial statements collected")
-
-        await self._broadcast_progress(35, "Collecting enterprise values...")
-        self._collect_ev()
-        await self._broadcast_progress(40, "✓ Enterprise values collected")
-        
-        await self._broadcast_progress(45, "Collecting employee history...")
-        self._collect_employees()
-        await self._broadcast_progress(50, "✓ Employee history collected")
-
-        await self._broadcast_progress(55, "Collecting price histories...")
-        self._collect_prices()
-        await self._broadcast_progress(70, "✓ Price histories collected")
-                
         if self.include_institutional:
-            await self._broadcast_progress(72, "Collecting insider trading...")
-            self._collect_insider_trading_latest()
-
-            await self._broadcast_progress(77, "Collecting institutional ownership...")
-            self._collect_institutional_ownership()
-
-            await self._broadcast_progress(82, "Collecting insider statistics...")
-            self._collect_insider_statistics()
-
-            await self._broadcast_progress(85, "✓ Institutional data collected")
-        else:
-            await self._broadcast_progress(85, "Skipping institutional data collection")
+            print("Collecting latest insider trading ..."); self._collect_insider_trading_latest()
+            print("Collecting institutional ownership summaries ..."); self._collect_institutional_ownership()
+            print("Collecting insider trading statistics ..."); self._collect_insider_statistics()
+        
         if self.include_analyst:
-            await self._broadcast_progress(88, "Collecting analyst estimates...")
-            self._collect_analyst()
-            await self._broadcast_progress(95, "✓ Analyst estimates collected")
-        else:
-            await self._broadcast_progress(95, "Skipping analyst estimates collection")
-        
+            print("Collecting analyst estimates & price target consensus ..."); self._collect_analyst()
         self._collected = True
-        await self._broadcast_progress(95, "Data collection complete.")
-        
-    async def get_all_financial_data_async(self, force_collect: bool = False) -> pd.DataFrame:
-        await self.collect(force=force_collect)
+        print("✅ Raw collection complete.")
 
-        await self._broadcast_progress(96, "Building consolidated dataset...")
+    def get_all_financial_data(self, force_collect: bool = False) -> pd.DataFrame:
+        self.collect(force=force_collect)
         if self.all_fin_df.empty:
             self._build_all_financial_data()
         return self.all_fin_df
-    
-    def get_all_financial_data(self) -> pd.DataFrame:
-
-        return self.all_fin_df
 
     # ------------------------ Export ------------------------
-    async def export_excel(self, filename_base: Optional[str] = None) -> str:
+    def export_excel(self, filename_base: Optional[str] = None) -> str:
         if not self.availability:
             return
-        
-        await self._broadcast_progress(97, "Preparing export...")
         if self.all_fin_df is None or self.all_fin_df.empty:
             raise ValueError("No data to export. Call get_all_financial_data() first.")
 
@@ -952,8 +857,6 @@ class FinancialDataCollection:
             econ_ann = self.get_economic(force_refresh=False, econ_dir = str(self.econ_dir),)
         except Exception:
             econ_ann = pd.DataFrame()
-
-        await self._broadcast_progress(99, "Writing Excel file...")
 
         with pd.ExcelWriter(str(path), engine="openpyxl") as writer:  # ← cast to str for writer
             if isinstance(econ_ann, pd.DataFrame) and not econ_ann.empty:
@@ -980,19 +883,19 @@ class FinancialDataCollection:
                     df.to_excel(writer, sheet_name=tab[:31], index=False)
 
         print(f"✅ Excel written: {path}")
-
-        await self._broadcast_progress(100, "✓ Export complete!")
         return str(path)  # ← keep return type as str
 
     # ------------------------ Convenience getters ------------------------
     def get_profiles(self) -> pd.DataFrame:
         rows = []
+        current_year = datetime.now().year
         for name, sym in self.companies.items():
             d = self.profiles.get(name) or {}
             if d:
                 r = dict(d)
                 r["Company"] = name
                 r["Symbol"] = sym
+                r["Year"] = current_year
                 rows.append(r)
         return pd.DataFrame(rows)
 
@@ -1059,475 +962,641 @@ Five getter methods to extract financial statements and metrics from DatasetColl
 Add these methods to your DatasetCollection class
 """
 
-def get_income_statements(self) -> pd.DataFrame:
-    """
-    Get consolidated income statements for all companies across all years.
-    
-    Returns:
-        pd.DataFrame: Income statements with Company, Symbol, and Year columns
-    """
-    frames = []
-    for name, sym in self.companies.items():
-        hist = self.is_hist.get(name, [])
-        if hist:
-            df = pd.DataFrame(hist)
-            df["Company"] = name
-            df["Symbol"] = sym
-            frames.append(df)
-    
-    if not frames:
-        return pd.DataFrame()
-    
-    result = pd.concat(frames, ignore_index=True)
-    
-    # Ensure Year column exists
-    if "fiscalYear" in result.columns and "Year" not in result.columns:
-        result["Year"] = pd.to_numeric(result["fiscalYear"], errors="coerce")
-    
-    return result
+    def get_income_statements(self) -> pd.DataFrame:
+        """
+        Get consolidated income statements for all companies across all years.
+        
+        Returns:
+            pd.DataFrame: Income statements with Company, Symbol, and Year columns
+        """
+        frames = []
+        for name, sym in self.companies.items():
+            hist = self.is_hist.get(name, [])
+            if hist:
+                df = pd.DataFrame(hist)
+                df["Company"] = name
+                df["Symbol"] = sym
+                frames.append(df)
+        
+        if not frames:
+            return pd.DataFrame()
+        
+        result = pd.concat(frames, ignore_index=True)
+        
+        # Ensure Year column exists
+        if "fiscalYear" in result.columns and "Year" not in result.columns:
+            result["Year"] = pd.to_numeric(result["fiscalYear"], errors="coerce")
+        
+        return result
 
 
-def get_balance_sheets(self) -> pd.DataFrame:
-    """
-    Get consolidated balance sheets for all companies across all years.
-    
-    Returns:
-        pd.DataFrame: Balance sheets with Company, Symbol, and Year columns
-    """
-    frames = []
-    for name, sym in self.companies.items():
-        hist = self.bs_hist.get(name, [])
-        if hist:
-            df = pd.DataFrame(hist)
-            df["Company"] = name
-            df["Symbol"] = sym
-            frames.append(df)
-    
-    if not frames:
-        return pd.DataFrame()
-    
-    result = pd.concat(frames, ignore_index=True)
-    
-    # Ensure Year column exists
-    if "fiscalYear" in result.columns and "Year" not in result.columns:
-        result["Year"] = pd.to_numeric(result["fiscalYear"], errors="coerce")
-    
-    return result
+    def get_balance_sheets(self) -> pd.DataFrame:
+        """
+        Get consolidated balance sheets for all companies across all years.
+        
+        Returns:
+            pd.DataFrame: Balance sheets with Company, Symbol, and Year columns
+        """
+        frames = []
+        for name, sym in self.companies.items():
+            hist = self.bs_hist.get(name, [])
+            if hist:
+                df = pd.DataFrame(hist)
+                df["Company"] = name
+                df["Symbol"] = sym
+                frames.append(df)
+        
+        if not frames:
+            return pd.DataFrame()
+        
+        result = pd.concat(frames, ignore_index=True)
+        
+        # Ensure Year column exists
+        if "fiscalYear" in result.columns and "Year" not in result.columns:
+            result["Year"] = pd.to_numeric(result["fiscalYear"], errors="coerce")
+        
+        return result
 
 
-def get_cash_flows(self) -> pd.DataFrame:
-    """
-    Get consolidated cash flow statements for all companies across all years.
-    
-    Returns:
-        pd.DataFrame: Cash flow statements with Company, Symbol, and Year columns
-    """
-    frames = []
-    for name, sym in self.companies.items():
-        hist = self.cf_hist.get(name, [])
-        if hist:
-            df = pd.DataFrame(hist)
-            df["Company"] = name
-            df["Symbol"] = sym
-            frames.append(df)
-    
-    if not frames:
-        return pd.DataFrame()
-    
-    result = pd.concat(frames, ignore_index=True)
-    
-    # Ensure Year column exists
-    if "fiscalYear" in result.columns and "Year" not in result.columns:
-        result["Year"] = pd.to_numeric(result["fiscalYear"], errors="coerce")
-    
-    return result
+    def get_cash_flows(self) -> pd.DataFrame:
+        """
+        Get consolidated cash flow statements for all companies across all years.
+        
+        Returns:
+            pd.DataFrame: Cash flow statements with Company, Symbol, and Year columns
+        """
+        frames = []
+        for name, sym in self.companies.items():
+            hist = self.cf_hist.get(name, [])
+            if hist:
+                df = pd.DataFrame(hist)
+                df["Company"] = name
+                df["Symbol"] = sym
+                frames.append(df)
+        
+        if not frames:
+            return pd.DataFrame()
+        
+        result = pd.concat(frames, ignore_index=True)
+        
+        # Ensure Year column exists
+        if "fiscalYear" in result.columns and "Year" not in result.columns:
+            result["Year"] = pd.to_numeric(result["fiscalYear"], errors="coerce")
+        
+        return result
 
 
-def get_ratios(self) -> pd.DataFrame:
-    """
-    Get consolidated financial ratios for all companies across all years.
-    
-    Returns:
-        pd.DataFrame: Financial ratios with Company, Symbol, and Year columns
-    """
-    frames = []
-    for name, sym in self.companies.items():
-        hist = self.ratios_hist.get(name, [])
-        if hist:
-            df = pd.DataFrame(hist)
-            df["Company"] = name
-            df["Symbol"] = sym
-            frames.append(df)
-    
-    if not frames:
-        return pd.DataFrame()
-    
-    result = pd.concat(frames, ignore_index=True)
-    
-    # Ensure Year column exists (ratios might use 'date' field)
-    if "date" in result.columns:
-        result["Year"] = pd.to_datetime(result["date"], errors="coerce").dt.year
-    
-    return result
+    def get_ratios(self) -> pd.DataFrame:
+        """
+        Get consolidated financial ratios for all companies across all years.
+        
+        Returns:
+            pd.DataFrame: Financial ratios with Company, Symbol, and Year columns
+        """
+        frames = []
+        for name, sym in self.companies.items():
+            hist = self.ratios_hist.get(name, [])
+            if hist:
+                df = pd.DataFrame(hist)
+                df["Company"] = name
+                df["Symbol"] = sym
+                frames.append(df)
+        
+        if not frames:
+            return pd.DataFrame()
+        
+        result = pd.concat(frames, ignore_index=True)
+        
+        # Ensure Year column exists (ratios might use 'date' field)
+        if "date" in result.columns:
+            result["Year"] = pd.to_datetime(result["date"], errors="coerce").dt.year
+        
+        return result
 
 
-def get_key_metrics(self) -> pd.DataFrame:
-    """
-    Get consolidated key metrics for all companies across all years.
-    
-    Returns:
-        pd.DataFrame: Key metrics with Company, Symbol, and Year columns
-    """
-    frames = []
-    for name, sym in self.companies.items():
-        hist = self.km_hist.get(name, [])
-        if hist:
-            df = pd.DataFrame(hist)
-            df["Company"] = name
-            df["Symbol"] = sym
-            frames.append(df)
-    
-    if not frames:
-        return pd.DataFrame()
-    
-    result = pd.concat(frames, ignore_index=True)
-    
-    # Ensure Year column exists (key metrics might use 'date' field)
-    if "date" in result.columns:
-        result["Year"] = pd.to_datetime(result["date"], errors="coerce").dt.year
-    
-    return result
+    def get_key_metrics(self) -> pd.DataFrame:
+        """
+        Get consolidated key metrics for all companies across all years.
+        
+        Returns:
+            pd.DataFrame: Key metrics with Company, Symbol, and Year columns
+        """
+        frames = []
+        for name, sym in self.companies.items():
+            hist = self.km_hist.get(name, [])
+            if hist:
+                df = pd.DataFrame(hist)
+                df["Company"] = name
+                df["Symbol"] = sym
+                frames.append(df)
+        
+        if not frames:
+            return pd.DataFrame()
+        
+        result = pd.concat(frames, ignore_index=True)
+        
+        # Ensure Year column exists (key metrics might use 'date' field)
+        if "date" in result.columns:
+            result["Year"] = pd.to_datetime(result["date"], errors="coerce").dt.year
+        
+        return result
 
-"""
-S&P 500 getter methods for DatasetCollection
-Add these methods to your DatasetCollection class
-"""
+    """
+    S&P 500 getter methods for DatasetCollection
+    Add these methods to your DatasetCollection class
+    """
 
-def get_sp500_daily(self) -> pd.DataFrame:
-    """
-    Get S&P 500 daily price data.
-    
-    Returns:
-        pd.DataFrame: Daily S&P 500 prices with OHLC, volume, and technical indicators.
-                      Empty DataFrame if include_sp500=False or data not collected.
-    
-    Columns:
-        - date: Trading date (datetime64)
-        - symbol: "^GSPC"
-        - Index: "S&P500"
-        - open, high, low, close: OHLC prices
-        - adjClose: Adjusted close price
-        - volume: Daily trading volume
-        - unadjustedVolume: Original volume if provided
-        - change: Daily price change
-        - changePercent: Daily percentage change
-        - vwap: Volume weighted average price
-        - label: Date label
-        - changeOverTime: Cumulative change
-    
-    Example:
-        >>> collector = DatasetCollection(api_key="key", companies={"Apple": "AAPL"}, include_sp500=True)
-        >>> collector.collect()
-        >>> sp500 = collector.get_sp500_daily()
-        >>> print(sp500.shape)
-        (2520, 15)  # ~10 years of daily data
-    """
-    if not self.include_sp500:
-        print("Warning: S&P 500 data not collected. Set include_sp500=True when initializing.")
-        return pd.DataFrame()
-    
-    if not hasattr(self, 'sp500_daily') or self.sp500_daily is None:
-        return pd.DataFrame()
-    
-    return self.sp500_daily.copy()
-
-
-def get_sp500_monthly(self) -> pd.DataFrame:
-    """
-    Get S&P 500 monthly price data (month-end values).
-    
-    Returns:
-        pd.DataFrame: Monthly S&P 500 prices using last trading day of each month.
-                      Empty DataFrame if include_sp500=False or data not collected.
-    
-    Columns:
-        - date: Month-end date (datetime64)
-        - symbol: "^GSPC"
-        - Index: "S&P500"
-        - open, high, low, close: OHLC prices (month-end values)
-        - adjClose: Adjusted close price
-        - volume: Month-end trading volume
-        - unadjustedVolume: Original volume if provided
-        - change: Month-end price change
-        - changePercent: Month-end percentage change
-        - vwap: Month-end volume weighted average price
-        - label: Date label
-        - changeOverTime: Cumulative change
-    
-    Note:
-        This uses the LAST trading day value for each month (not aggregated).
-        For example, volume is the volume on the last trading day, not monthly total.
-    
-    Example:
-        >>> collector = DatasetCollection(api_key="key", companies={"Apple": "AAPL"}, include_sp500=True)
-        >>> collector.collect()
-        >>> sp500_monthly = collector.get_sp500_monthly()
-        >>> print(sp500_monthly.shape)
-        (120, 15)  # ~10 years of monthly data
-    """
-    if not self.include_sp500:
-        print("Warning: S&P 500 data not collected. Set include_sp500=True when initializing.")
-        return pd.DataFrame()
-    
-    if not hasattr(self, 'sp500_monthly') or self.sp500_monthly is None:
-        return pd.DataFrame()
-    
-    return self.sp500_monthly.copy()
+    def get_sp500_daily(self) -> pd.DataFrame:
+        """
+        Get S&P 500 daily price data.
+        
+        Returns:
+            pd.DataFrame: Daily S&P 500 prices with OHLC, volume, and technical indicators.
+                        Empty DataFrame if include_sp500=False or data not collected.
+        
+        Columns:
+            - date: Trading date (datetime64)
+            - symbol: "^GSPC"
+            - Index: "S&P500"
+            - open, high, low, close: OHLC prices
+            - adjClose: Adjusted close price
+            - volume: Daily trading volume
+            - unadjustedVolume: Original volume if provided
+            - change: Daily price change
+            - changePercent: Daily percentage change
+            - vwap: Volume weighted average price
+            - label: Date label
+            - changeOverTime: Cumulative change
+        
+        Example:
+            >>> collector = DatasetCollection(api_key="key", companies={"Apple": "AAPL"}, include_sp500=True)
+            >>> collector.collect()
+            >>> sp500 = collector.get_sp500_daily()
+            >>> print(sp500.shape)
+            (2520, 15)  # ~10 years of daily data
+        """
+        if not self.include_sp500:
+            print("Warning: S&P 500 data not collected. Set include_sp500=True when initializing.")
+            return pd.DataFrame()
+        
+        if not hasattr(self, 'sp500_daily') or self.sp500_daily is None:
+            return pd.DataFrame()
+        
+        return self.sp500_daily.copy()
 
 
-def get_sp500_summary(self) -> dict:
-    """
-    Get summary statistics for S&P 500 data.
-    
-    Returns:
-        dict: Dictionary containing summary statistics including:
-            - daily_records: Number of daily price records
-            - monthly_records: Number of monthly price records
-            - date_range: Tuple of (start_date, end_date)
-            - latest_close: Most recent closing price
-            - period_return: Total return over the period
-            - avg_daily_volume: Average daily trading volume
-    
-    Example:
-        >>> summary = collector.get_sp500_summary()
-        >>> print(f"S&P 500 latest close: ${summary['latest_close']:.2f}")
-        >>> print(f"Period return: {summary['period_return']:.2%}")
-    """
-    if not self.include_sp500:
-        return {
-            "error": "S&P 500 data not collected. Set include_sp500=True when initializing."
+    def get_sp500_monthly(self) -> pd.DataFrame:
+        """
+        Get S&P 500 monthly price data (month-end values).
+        
+        Returns:
+            pd.DataFrame: Monthly S&P 500 prices using last trading day of each month.
+                        Empty DataFrame if include_sp500=False or data not collected.
+        
+        Columns:
+            - date: Month-end date (datetime64)
+            - symbol: "^GSPC"
+            - Index: "S&P500"
+            - open, high, low, close: OHLC prices (month-end values)
+            - adjClose: Adjusted close price
+            - volume: Month-end trading volume
+            - unadjustedVolume: Original volume if provided
+            - change: Month-end price change
+            - changePercent: Month-end percentage change
+            - vwap: Month-end volume weighted average price
+            - label: Date label
+            - changeOverTime: Cumulative change
+        
+        Note:
+            This uses the LAST trading day value for each month (not aggregated).
+            For example, volume is the volume on the last trading day, not monthly total.
+        
+        Example:
+            >>> collector = DatasetCollection(api_key="key", companies={"Apple": "AAPL"}, include_sp500=True)
+            >>> collector.collect()
+            >>> sp500_monthly = collector.get_sp500_monthly()
+            >>> print(sp500_monthly.shape)
+            (120, 15)  # ~10 years of monthly data
+        """
+        if not self.include_sp500:
+            print("Warning: S&P 500 data not collected. Set include_sp500=True when initializing.")
+            return pd.DataFrame()
+        
+        if not hasattr(self, 'sp500_monthly') or self.sp500_monthly is None:
+            return pd.DataFrame()
+        
+        return self.sp500_monthly.copy()
+
+
+    def get_sp500_summary(self) -> dict:
+        """
+        Get summary statistics for S&P 500 data.
+        
+        Returns:
+            dict: Dictionary containing summary statistics including:
+                - daily_records: Number of daily price records
+                - monthly_records: Number of monthly price records
+                - date_range: Tuple of (start_date, end_date)
+                - latest_close: Most recent closing price
+                - period_return: Total return over the period
+                - avg_daily_volume: Average daily trading volume
+        
+        Example:
+            >>> summary = collector.get_sp500_summary()
+            >>> print(f"S&P 500 latest close: ${summary['latest_close']:.2f}")
+            >>> print(f"Period return: {summary['period_return']:.2%}")
+        """
+        if not self.include_sp500:
+            return {
+                "error": "S&P 500 data not collected. Set include_sp500=True when initializing."
+            }
+        
+        daily = self.get_sp500_daily()
+        monthly = self.get_sp500_monthly()
+        
+        if daily.empty:
+            return {"error": "No S&P 500 data available"}
+        
+        summary = {
+            "daily_records": len(daily),
+            "monthly_records": len(monthly),
+            "date_range": (
+                daily['date'].min() if 'date' in daily.columns else None,
+                daily['date'].max() if 'date' in daily.columns else None
+            ),
+            "latest_close": None,
+            "period_return": None,
+            "avg_daily_volume": None,
         }
-    
-    daily = self.get_sp500_daily()
-    monthly = self.get_sp500_monthly()
-    
-    if daily.empty:
-        return {"error": "No S&P 500 data available"}
-    
-    summary = {
-        "daily_records": len(daily),
-        "monthly_records": len(monthly),
-        "date_range": (
-            daily['date'].min() if 'date' in daily.columns else None,
-            daily['date'].max() if 'date' in daily.columns else None
-        ),
-        "latest_close": None,
-        "period_return": None,
-        "avg_daily_volume": None,
-    }
-    
-    if 'close' in daily.columns and not daily['close'].isna().all():
-        summary["latest_close"] = daily['close'].iloc[-1]
-        first_close = daily['close'].iloc[0]
-        last_close = daily['close'].iloc[-1]
-        if first_close and first_close > 0:
-            summary["period_return"] = (last_close - first_close) / first_close
-    
-    if 'volume' in daily.columns:
-        summary["avg_daily_volume"] = daily['volume'].mean()
-    
-    return summary
-
-# ============================================================================
-# EMPLOYEE HISTORY GETTER
-# ============================================================================
-
-def get_employee_history(self) -> pd.DataFrame:
-    """
-    Get historical employee count data for all companies.
-    
-    Returns:
-        pd.DataFrame: Employee history with columns:
-            - symbol: Stock ticker
-            - periodOfReport: Reporting period date
-            - filingDate: SEC filing date
-            - employeeCount: Number of employees
-            - source: Data source
-            - formType: SEC form type
-            - acceptanceTime: Filing acceptance time
-            - Company: Company name
-            - Symbol: Stock ticker (duplicate for consistency)
-    
-    Example:
-        >>> emp_history = collector.get_employee_history()
-        >>> # Analyze headcount trends
-        >>> apple_emp = emp_history[emp_history['Symbol'] == 'AAPL']
-        >>> apple_emp.plot(x='periodOfReport', y='employeeCount')
-    """
-    frames = []
-    for name, sym in self.companies.items():
-        df = self.emp_hist.get(name)
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            df_copy = df.copy()
-            df_copy["Company"] = name
-            df_copy["Symbol"] = sym
-            frames.append(df_copy)
-    
-    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-
-
-# ============================================================================
-# ECONOMIC DATA GETTER (already exists via get_economic, but create wrapper)
-# ============================================================================
-
-def get_economic_data(self, force_refresh: bool = False) -> pd.DataFrame:
-    """
-    Get annual macroeconomic indicators from FRED.
-    
-    This is a convenience wrapper around get_economic().
-    
-    Returns:
-        pd.DataFrame: Annual economic indicators including:
-            - Year: Calendar year
-            - Date: Year-end date
-            
-            Growth & Output:
-            - Real_GDP, GDP, Industrial_Production, Capacity_Utilization
-            
-            Inflation/Prices:
-            - CPI_All_Items, Core_CPI, PCE_Price_Index, Producer_Price_Index
-            
-            Labor:
-            - Unemployment_Rate, Nonfarm_Payrolls, Labor_Force_Participation
-            - Job_Openings, Initial_Jobless_Claims
-            
-            Interest Rates:
-            - Fed_Funds_Rate
-            - Treasury rates (1M through 30Y full curve)
-            - Spreads: Spread_10Y_3M, Spread_5Y_3M, Yield_Curve_10Y_2Y
-            
-            Markets:
-            - S&P_500_Index, VIX_Index
-            
-            Housing:
-            - Housing_Starts, Building_Permits, Mortgage_Rate_30Y
-            - Median_House_Price, Housing_Months_Supply
-            
-            Money/Credit:
-            - M2_Money_Supply, Retail_Money_Funds, Credit_Card_Rate
-            
-            Consumer:
-            - Consumer_Sentiment, Retail_Sales, Vehicle_Sales
-            
-            Other:
-            - Durable_Goods_Orders, Recession_Prob_Smoothed
-    
-    Args:
-        force_refresh: If True, forces re-collection of economic data
-    
-    Example:
-        >>> econ = collector.get_economic_data()
-        >>> # Analyze recession indicators
-        >>> recent = econ[econ['Year'] >= 2020]
-        >>> print(recent[['Year', 'Unemployment_Rate', 'Fed_Funds_Rate', 'GDP']])
-    """
-    return self.get_economic(force_refresh=force_refresh)
-
-
-# ============================================================================
-# METRICS ONLY (NUMERIC DATA)
-# ============================================================================
-
-def get_metrics_only(self) -> pd.DataFrame:
-    """
-    Get numeric-only financial metrics (excludes text/metadata columns).
-    
-    This is a filtered version of get_all_financial_data() containing only
-    numeric columns suitable for quantitative analysis.
-    
-    Returns:
-        pd.DataFrame: Numeric financial metrics with identity columns
-            (Company, Symbol, Year) plus all numeric financial fields
-    
-    Example:
-        >>> metrics = collector.get_metrics_only()
-        >>> # Calculate correlation matrix
-        >>> numeric_cols = metrics.select_dtypes(include=[np.number]).columns
-        >>> corr_matrix = metrics[numeric_cols].corr()
-    """
-    if self.metrics_df is not None and not self.metrics_df.empty:
-        return self.metrics_df.copy()
-    
-    # If metrics_df not built yet, return empty
-    return pd.DataFrame()
-
-
-# ============================================================================
-# RAW TABLES ACCESS (CONSOLIDATED)
-# ============================================================================
-
-def get_raw_table(self, table_name: str) -> pd.DataFrame:
-    """
-    Get any raw table by name from the consolidated raw_tables dictionary.
-    
-    Available table names:
-        Financial Statements:
-        - "Income_Statements"
-        - "Balance_Sheets"
-        - "Cash_Flows"
-        - "Ratios"
-        - "Key_Metrics"
         
-        Market Data:
-        - "Prices_Daily"
-        - "Prices_Monthly"
-        - "SP500_Daily"
-        - "SP500_Monthly"
-        - "Enterprise_Values"
+        if 'close' in daily.columns and not daily['close'].isna().all():
+            summary["latest_close"] = daily['close'].iloc[-1]
+            first_close = daily['close'].iloc[0]
+            last_close = daily['close'].iloc[-1]
+            if first_close and first_close > 0:
+                summary["period_return"] = (last_close - first_close) / first_close
         
-        Company Info:
-        - "Profiles"
-        - "Employee_History"
+        if 'volume' in daily.columns:
+            summary["avg_daily_volume"] = daily['volume'].mean()
         
-        Analyst Data:
-        - "Analyst_Estimates"
-        - "Analyst_Targets"
+        return summary
+
+    # ============================================================================
+    # EMPLOYEE HISTORY GETTER
+    # ============================================================================
+
+    def get_employee_history(self) -> pd.DataFrame:
+        """
+        Get historical employee count data for all companies.
         
-        Institutional/Insider:
-        - "Insider_Trading_Latest"
-        - "Institutional_Ownership"
-        - "Insider_Statistics"
+        Returns:
+            pd.DataFrame: Employee history with columns:
+                - symbol: Stock ticker
+                - periodOfReport: Reporting period date
+                - filingDate: SEC filing date
+                - employeeCount: Number of employees
+                - source: Data source
+                - formType: SEC form type
+                - acceptanceTime: Filing acceptance time
+                - Company: Company name
+                - Symbol: Stock ticker (duplicate for consistency)
         
-        Economic:
-        - "Economic_Annual"
+        Example:
+            >>> emp_history = collector.get_employee_history()
+            >>> # Analyze headcount trends
+            >>> apple_emp = emp_history[emp_history['Symbol'] == 'AAPL']
+            >>> apple_emp.plot(x='periodOfReport', y='employeeCount')
+        """
+        frames = []
+        for name, sym in self.companies.items():
+            df = self.emp_hist.get(name)
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                df_copy = df.copy()
+                df_copy["Company"] = name
+                df_copy["Symbol"] = sym
+                frames.append(df_copy)
         
-        Consolidated:
-        - "All_Financial_Data"
-        - "Metrics"
-    
-    Args:
-        table_name: Name of the table to retrieve
-    
-    Returns:
-        pd.DataFrame: Requested table, or empty DataFrame if not found
-    
-    Example:
-        >>> ratios = collector.get_raw_table("Ratios")
-        >>> profiles = collector.get_raw_table("Profiles")
-    """
-    return self.raw_tables.get(table_name, pd.DataFrame()).copy()
+        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
-def list_available_tables(self) -> list:
-    """
-    List all available table names in raw_tables.
+    # ============================================================================
+    # ECONOMIC DATA GETTER (already exists via get_economic, but create wrapper)
+    # ============================================================================
+
+    def get_economic_data(self, force_refresh: bool = False) -> pd.DataFrame:
+        """
+        Get annual macroeconomic indicators from FRED.
+        
+        This is a convenience wrapper around get_economic().
+        
+        Returns:
+            pd.DataFrame: Annual economic indicators including:
+                - Year: Calendar year
+                - Date: Year-end date
+                
+                Growth & Output:
+                - Real_GDP, GDP, Industrial_Production, Capacity_Utilization
+                
+                Inflation/Prices:
+                - CPI_All_Items, Core_CPI, PCE_Price_Index, Producer_Price_Index
+                
+                Labor:
+                - Unemployment_Rate, Nonfarm_Payrolls, Labor_Force_Participation
+                - Job_Openings, Initial_Jobless_Claims
+                
+                Interest Rates:
+                - Fed_Funds_Rate
+                - Treasury rates (1M through 30Y full curve)
+                - Spreads: Spread_10Y_3M, Spread_5Y_3M, Yield_Curve_10Y_2Y
+                
+                Markets:
+                - S&P_500_Index, VIX_Index
+                
+                Housing:
+                - Housing_Starts, Building_Permits, Mortgage_Rate_30Y
+                - Median_House_Price, Housing_Months_Supply
+                
+                Money/Credit:
+                - M2_Money_Supply, Retail_Money_Funds, Credit_Card_Rate
+                
+                Consumer:
+                - Consumer_Sentiment, Retail_Sales, Vehicle_Sales
+                
+                Other:
+                - Durable_Goods_Orders, Recession_Prob_Smoothed
+        
+        Args:
+            force_refresh: If True, forces re-collection of economic data
+        
+        Example:
+            >>> econ = collector.get_economic_data()
+            >>> # Analyze recession indicators
+            >>> recent = econ[econ['Year'] >= 2020]
+            >>> print(recent[['Year', 'Unemployment_Rate', 'Fed_Funds_Rate', 'GDP']])
+        """
+        return self.get_economic(force_refresh=force_refresh)
+
+
+    # ============================================================================
+    # METRICS ONLY (NUMERIC DATA)
+    # ============================================================================
+
+    def get_metrics_only(self) -> pd.DataFrame:
+        """
+        Get numeric-only financial metrics (excludes text/metadata columns).
+        
+        This is a filtered version of get_all_financial_data() containing only
+        numeric columns suitable for quantitative analysis.
+        
+        Returns:
+            pd.DataFrame: Numeric financial metrics with identity columns
+                (Company, Symbol, Year) plus all numeric financial fields
+        
+        Example:
+            >>> metrics = collector.get_metrics_only()
+            >>> # Calculate correlation matrix
+            >>> numeric_cols = metrics.select_dtypes(include=[np.number]).columns
+            >>> corr_matrix = metrics[numeric_cols].corr()
+        """
+        if self.metrics_df is not None and not self.metrics_df.empty:
+            return self.metrics_df.copy()
+        
+        # If metrics_df not built yet, return empty
+        return pd.DataFrame()
     
-    Returns:
-        list: List of table names that have been collected and built
-    
-    Example:
-        >>> tables = collector.list_available_tables()
-        >>> print("Available tables:", tables)
-        ['Income_Statements', 'Balance_Sheets', 'Cash_Flows', ...]
-    """
-    return [k for k, v in self.raw_tables.items() if not v.empty]
+    def get_analyst_estimates_only(self) -> pd.DataFrame:
+        """
+        Get analyst estimates (revenue, EBITDA, EPS projections) only.
+        
+        Returns:
+            pd.DataFrame: Annual analyst estimates with columns:
+                - symbol: Stock ticker
+                - date: Estimate date
+                - revenueLow: Low revenue estimate
+                - revenueHigh: High revenue estimate
+                - revenueAvg: Average revenue estimate
+                - ebitdaLow: Low EBITDA estimate
+                - ebitdaHigh: High EBITDA estimate
+                - ebitdaAvg: Average EBITDA estimate
+                - ebitLow: Low EBIT estimate
+                - ebitHigh: High EBIT estimate
+                - ebitAvg: Average EBIT estimate
+                - netIncomeLow: Low net income estimate
+                - netIncomeHigh: High net income estimate
+                - netIncomeAvg: Average net income estimate
+                - sgaExpenseLow: Low SG&A expense estimate
+                - sgaExpenseHigh: High SG&A expense estimate
+                - sgaExpenseAvg: Average SG&A expense estimate
+                - epsAvg: Average EPS estimate
+                - epsHigh: High EPS estimate
+                - epsLow: Low EPS estimate
+                - numAnalystsRevenue: Number of analysts covering revenue
+                - numAnalystsEps: Number of analysts covering EPS
+                - Company: Company name
+                - Symbol: Stock ticker
+        
+        Example:
+            >>> estimates = collector.get_analyst_estimates_only()
+            >>> # Analyze EPS estimate spreads
+            >>> estimates['eps_spread'] = estimates['epsHigh'] - estimates['epsLow']
+            >>> estimates['eps_uncertainty'] = estimates['eps_spread'] / estimates['epsAvg']
+        """
+        if not self.include_analyst:
+            print("Warning: Analyst data not collected. Set include_analyst=True when initializing.")
+            return pd.DataFrame()
+        
+        est_frames = []
+        for name, sym in self.companies.items():
+            df = self.analyst_estimates.get(name)
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                df_copy = df.copy()
+                df_copy["Company"] = name
+                df_copy["Symbol"] = sym
+                est_frames.append(df_copy)
+        
+        return pd.concat(est_frames, ignore_index=True) if est_frames else pd.DataFrame()
+
+
+    def get_price_targets(self) -> pd.DataFrame:
+        """
+        Get analyst price target consensus data.
+        
+        Returns:
+            pd.DataFrame: Price target consensus with columns:
+                - symbol: Stock ticker
+                - targetHigh: Highest analyst price target
+                - targetLow: Lowest analyst price target
+                - targetConsensus: Consensus (average) price target
+                - targetMedian: Median analyst price target
+                - Company: Company name
+                - Symbol: Stock ticker
+        
+        Example:
+            >>> targets = collector.get_price_targets()
+            >>> # Calculate upside/downside potential
+            >>> current_prices = collector.get_prices_daily().groupby('Symbol')['close'].last()
+            >>> targets = targets.merge(current_prices, on='Symbol', suffixes=('', '_current'))
+            >>> targets['upside_pct'] = (targets['targetConsensus'] - targets['close']) / targets['close'] * 100
+            >>> print(targets[['Company', 'close', 'targetConsensus', 'upside_pct']])
+        """
+        if not self.include_analyst:
+            print("Warning: Analyst data not collected. Set include_analyst=True when initializing.")
+            return pd.DataFrame()
+        
+        tgt_frames = []
+        for name, sym in self.companies.items():
+            df = self.price_targets.get(name)
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                df_copy = df.copy()
+                df_copy["Company"] = name
+                df_copy["Symbol"] = sym
+                tgt_frames.append(df_copy)
+        
+        return pd.concat(tgt_frames, ignore_index=True) if tgt_frames else pd.DataFrame()
+
+
+    def get_analyst_coverage_summary(self) -> pd.DataFrame:
+        """
+        Get summary statistics about analyst coverage across all companies.
+        
+        Returns:
+            pd.DataFrame: Summary with one row per company containing:
+                - Company: Company name
+                - Symbol: Stock ticker
+                - num_analysts_revenue: Number of analysts covering revenue
+                - num_analysts_eps: Number of analysts covering EPS
+                - latest_eps_estimate: Most recent average EPS estimate
+                - price_target_consensus: Consensus price target
+                - price_target_range: Range between high and low targets
+                - target_dispersion: Standard measure of analyst disagreement
+        
+        Example:
+            >>> coverage = collector.get_analyst_coverage_summary()
+            >>> # Identify high conviction vs high uncertainty stocks
+            >>> coverage['conviction'] = coverage['num_analysts_eps'] / coverage['target_dispersion']
+            >>> print(coverage.sort_values('conviction', ascending=False))
+        """
+        if not self.include_analyst:
+            print("Warning: Analyst data not collected. Set include_analyst=True when initializing.")
+            return pd.DataFrame()
+        
+        estimates = self.get_analyst_estimates_only()
+        targets = self.get_price_targets()
+        
+        summary_rows = []
+        
+        for name, sym in self.companies.items():
+            row = {
+                'Company': name,
+                'Symbol': sym,
+                'num_analysts_revenue': None,
+                'num_analysts_eps': None,
+                'latest_eps_estimate': None,
+                'price_target_consensus': None,
+                'price_target_high': None,
+                'price_target_low': None,
+                'price_target_range': None,
+                'target_dispersion': None
+            }
+            
+            # Get latest estimates
+            if not estimates.empty:
+                company_est = estimates[estimates['Symbol'] == sym]
+                if not company_est.empty:
+                    latest = company_est.iloc[0]  # Assuming sorted by date, most recent first
+                    row['num_analysts_revenue'] = latest.get('numAnalystsRevenue')
+                    row['num_analysts_eps'] = latest.get('numAnalystsEps')
+                    row['latest_eps_estimate'] = latest.get('epsAvg')
+            
+            # Get price targets
+            if not targets.empty:
+                company_tgt = targets[targets['Symbol'] == sym]
+                if not company_tgt.empty:
+                    latest_tgt = company_tgt.iloc[0]
+                    row['price_target_consensus'] = latest_tgt.get('targetConsensus')
+                    row['price_target_high'] = latest_tgt.get('targetHigh')
+                    row['price_target_low'] = latest_tgt.get('targetLow')
+                    
+                    # Calculate range and dispersion
+                    high = latest_tgt.get('targetHigh')
+                    low = latest_tgt.get('targetLow')
+                    consensus = latest_tgt.get('targetConsensus')
+                    
+                    if high and low:
+                        row['price_target_range'] = high - low
+                        if consensus and consensus > 0:
+                            row['target_dispersion'] = (high - low) / consensus
+            
+            summary_rows.append(row)
+        
+        return pd.DataFrame(summary_rows)
+
+    # ============================================================================
+    # RAW TABLES ACCESS (CONSOLIDATED)
+    # ============================================================================
+
+    def get_raw_table(self, table_name: str) -> pd.DataFrame:
+        """
+        Get any raw table by name from the consolidated raw_tables dictionary.
+        
+        Available table names:
+            Financial Statements:
+            - "Income_Statements"
+            - "Balance_Sheets"
+            - "Cash_Flows"
+            - "Ratios"
+            - "Key_Metrics"
+            
+            Market Data:
+            - "Prices_Daily"
+            - "Prices_Monthly"
+            - "SP500_Daily"
+            - "SP500_Monthly"
+            - "Enterprise_Values"
+            
+            Company Info:
+            - "Profiles"
+            - "Employee_History"
+            
+            Analyst Data:
+            - "Analyst_Estimates"
+            - "Analyst_Targets"
+            
+            Institutional/Insider:
+            - "Insider_Trading_Latest"
+            - "Institutional_Ownership"
+            - "Insider_Statistics"
+            
+            Economic:
+            - "Economic_Annual"
+            
+            Consolidated:
+            - "All_Financial_Data"
+            - "Metrics"
+        
+        Args:
+            table_name: Name of the table to retrieve
+        
+        Returns:
+            pd.DataFrame: Requested table, or empty DataFrame if not found
+        
+        Example:
+            >>> ratios = collector.get_raw_table("Ratios")
+            >>> profiles = collector.get_raw_table("Profiles")
+        """
+        return self.raw_tables.get(table_name, pd.DataFrame()).copy()
+
+
+    def list_available_tables(self) -> list:
+        """
+        List all available table names in raw_tables.
+        
+        Returns:
+            list: List of table names that have been collected and built
+        
+        Example:
+            >>> tables = collector.list_available_tables()
+            >>> print("Available tables:", tables)
+            ['Income_Statements', 'Balance_Sheets', 'Cash_Flows', ...]
+        """
+        return [k for k, v in self.raw_tables.items() if not v.empty]

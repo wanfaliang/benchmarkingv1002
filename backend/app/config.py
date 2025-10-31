@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    DOCS_PASSWORD: str
     
     # API Keys
     FMP_API_KEY: Optional[str] = None

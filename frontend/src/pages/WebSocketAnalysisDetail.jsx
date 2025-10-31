@@ -1,24 +1,27 @@
 // frontend/src/pages/AnalysisDetail.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-// import { useAuth } from '../context/AuthContext';
 import { analysisAPI } from '../services/api';
+import useWebSocket from '../hooks/useWebSocket';
 import { 
    ArrowLeft, Play, RefreshCw, Download,
-  CheckCircle, Clock, XCircle,  Loader, ChevronRight
+  CheckCircle, Clock, XCircle,  Loader, ChevronRight,
+  Database, BarChart2, Users, DollarSign, TrendingUp, FileText, Wifi, WifiOff
 } from 'lucide-react';
 
 const AnalysisDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  // const { user, logout } = useAuth();
 
   const [analysis, setAnalysis] = useState(null);
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
-  const [showCollectionModal, setShowCollectionModal] = useState(false);
+  
+  // WebSocket real-time state
+  const [realtimeProgress, setRealtimeProgress] = useState(null);
+  const [realtimeMessage, setRealtimeMessage] = useState('');
 
   // Fetch analysis details
   const fetchAnalysis = useCallback(async () => {
@@ -49,16 +52,73 @@ const AnalysisDetail = () => {
     loadData();
   }, [id, fetchAnalysis, fetchSections]);
 
-  useEffect(() => {
-    if (analysis?.status === 'collection_complete' && showCollectionModal) {
-      setShowCollectionModal(false); // ← Close modal
-    }
-  }, [analysis?.status, showCollectionModal]);
+  // Determine if we should use WebSocket
+  const shouldUseWebSocket = analysis?.status === 'collecting' || 
+                             analysis?.status === 'generating';
 
-  // Polling - refresh every 1.5 seconds if not complete
-  // Polling for analysis status (Phase A - during collecting)
+  // WebSocket message handler
+  const handleWebSocketMessage = useCallback((data) => {
+    console.log('📨 WebSocket update:', data);
+    
+    switch (data.type) {
+      case 'connected':
+        console.log('✅ WebSocket connected successfully');
+        break;
+        
+      case 'progress':
+        // Update real-time progress
+        setRealtimeProgress(data.progress);
+        setRealtimeMessage(data.message);
+        
+        // Also update analysis state if status changed
+        if (data.status && analysis) {
+          setAnalysis(prev => ({
+            ...prev,
+            status: data.status,
+            phase: data.phase,
+            progress: data.progress
+          }));
+        }
+        break;
+        
+      case 'section_update':
+        // Update specific section status
+        setSections(prev => prev.map(section => 
+          section.section_number === data.section.number
+            ? { ...section, status: data.section.status, error_message: data.section.error_message }
+            : section
+        ));
+        break;
+        
+      case 'completion':
+        // Refresh full analysis data on completion
+        fetchAnalysis();
+        fetchSections();
+        setRealtimeProgress(null);
+        setRealtimeMessage('');
+        break;
+        
+      case 'error':
+        // Show error
+        setError(data.error);
+        fetchAnalysis();
+        break;
+        
+      default:
+        console.log('Unknown WebSocket message type:', data.type);
+    }
+  }, [analysis, fetchAnalysis, fetchSections]);
+
+  // Initialize WebSocket
+  const { isConnected} = useWebSocket(
+    id, 
+    handleWebSocketMessage,
+    shouldUseWebSocket
+  );
+
+  // Fallback polling - ONLY if WebSocket is not connected
   useEffect(() => {
-    if (!analysis) return;
+    if (!analysis || isConnected) return;
   
     const shouldPoll = analysis.status !== 'complete' && 
                        analysis.status !== 'failed' &&
@@ -66,26 +126,24 @@ const AnalysisDetail = () => {
                        analysis.status !== 'created';
   
     if (shouldPoll) {
+      console.log('⚠️ Using fallback polling (WebSocket not connected)');
       const interval = setInterval(() => {
         fetchAnalysis();
         fetchSections();
-      }, 1500);
+      }, 5000); // Slower polling as fallback
   
       return () => clearInterval(interval);
     }
-  }, [analysis?.status, fetchAnalysis, fetchSections, analysis]);
+  }, [analysis?.status, isConnected, fetchAnalysis, fetchSections, analysis]);
 
   // Action handlers
   const handleStartCollection = async () => {
     setActionLoading('collection');
-    setShowCollectionModal(true); // ← Show modal after starting
     try {
       await analysisAPI.startCollection(id);
       await fetchAnalysis();
-      
     } catch (err) {
       alert('Failed to start collection: ' + (err.response?.data?.detail || err.message));
-      setShowCollectionModal(false);
     } finally {
       setActionLoading(null);
     }
@@ -147,6 +205,15 @@ const AnalysisDetail = () => {
     }
   };
 
+  const getProgressIcon = (progress) => {
+    if (progress < 10) return <Database size={18} />;
+    if (progress < 30) return <FileText size={18} />;
+    if (progress < 50) return <BarChart2 size={18} />;
+    if (progress < 70) return <TrendingUp size={18} />;
+    if (progress < 85) return <Users size={18} />;
+    return <DollarSign size={18} />;
+  };
+
   const getStatusIcon = (status) => {
     const icons = {
       complete: <CheckCircle size={20} style={{ color: '#10b981' }} />,
@@ -202,13 +269,13 @@ const AnalysisDetail = () => {
 
   const completedSections = sections.filter(s => s.status === 'complete').length;
   const progressPercent = sections.length > 0 ? (completedSections / sections.length * 100) : 0;
+  
+  // Use real-time progress if available, otherwise fall back to analysis.progress
+  const displayProgress = realtimeProgress !== null ? realtimeProgress : (analysis.progress || 0);
+  const displayMessage = realtimeMessage || 'Starting...';
 
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb' }}>
-      {/* Header */}
-      
-
-      {/* Main Content */}
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 5%' }}>
         {/* Back Button */}
         <button
@@ -230,6 +297,25 @@ const AnalysisDetail = () => {
           <ArrowLeft size={18} />
           Back to Dashboard
         </button>
+
+        {/* WebSocket Status Indicator */}
+        {shouldUseWebSocket && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.5rem 1rem',
+            background: isConnected ? '#dcfce7' : '#fee2e2',
+            borderRadius: '8px',
+            marginBottom: '1rem',
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: isConnected ? '#166534' : '#991b1b'
+          }}>
+            {isConnected ? <Wifi size={16} /> : <WifiOff size={16} />}
+            {isConnected ? 'Real-time updates active' : 'Using fallback mode'}
+          </div>
+        )}
 
         {/* Analysis Info */}
         <div style={{
@@ -272,15 +358,59 @@ const AnalysisDetail = () => {
             {getStatusBadge(analysis.status)}
           </div>
 
-          {/* Progress Bar */}
-          {analysis.status !== 'created' && analysis.status !== 'complete' && (
+          {/* Real-time Progress Display for Data Collection */}
+          {analysis.status === 'collecting' && (
+            <div style={{ 
+              marginTop: '1.5rem',
+              padding: '1.5rem',
+              background: '#f0f9ff',
+              borderRadius: '8px',
+              border: '1px solid #bae6fd'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ color: '#0284c7' }}>
+                  {getProgressIcon(displayProgress)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ 
+                    fontSize: '0.95rem', 
+                    fontWeight: '600', 
+                    color: '#0c4a6e',
+                    marginBottom: '0.25rem'
+                  }}>
+                    {displayMessage}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#0369a1' }}>
+                    {displayProgress}% Complete
+                  </div>
+                </div>
+              </div>
+              <div style={{
+                width: '100%',
+                height: '8px',
+                background: '#e0f2fe',
+                borderRadius: '4px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${displayProgress}%`,
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #0ea5e9, #0284c7)',
+                  transition: 'width 0.3s ease-out'
+                }} />
+              </div>
+            </div>
+          )}
+
+          {/* Section Generation Progress */}
+          {analysis.status === 'generating' && (
             <div style={{ marginTop: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                 <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>
-                  {analysis.phase === 'A' ? 'Data Collection' : 'Generating Sections'}
+                  Generating Analysis Sections
                 </span>
                 <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#667eea' }}>
-                  {analysis.phase === 'B' ? `${completedSections}/${sections.length}` : `${analysis.progress}%`}
+                  {completedSections}/{sections.length}
                 </span>
               </div>
               <div style={{
@@ -291,7 +421,7 @@ const AnalysisDetail = () => {
                 overflow: 'hidden'
               }}>
                 <div style={{
-                  width: `${analysis.phase === 'B' ? progressPercent : analysis.progress}%`,
+                  width: `${progressPercent}%`,
                   height: '100%',
                   background: 'linear-gradient(90deg, #667eea, #764ba2)',
                   transition: 'width 0.5s'
@@ -525,34 +655,6 @@ const AnalysisDetail = () => {
           }
         `}
       </style>
-      {showCollectionModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
-            {/* Animated loader with background */}
-            <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center mb-4">
-              <Loader className="w-8 h-8 text-indigo-600 animate-spin" />
-            </div>
-            
-            {/* Title with proper contrast */}
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">
-              Collecting Data...
-            </h3>
-            
-            {/* Description */}
-            <p className="text-slate-600 text-sm mb-6">
-              This may take several minutes. You can close this window and check progress from the dashboard.
-            </p>
-            
-            {/* Close button */}
-            <button
-              onClick={() => setShowCollectionModal(false)}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
