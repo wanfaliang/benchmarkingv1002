@@ -203,6 +203,318 @@ export const queriesAPI = {
   }),
 };
 
+// ============================================================================
+// RESEARCH MODULE - Treasury Explorer
+// ============================================================================
+
+export const treasuryResearchAPI = {
+  // Get summary statistics for each term
+  getTerms: () => api.get('/api/research/treasury/terms'),
+
+  // Get list of auctions with filters
+  getAuctions: (params = {}) => api.get('/api/research/treasury/auctions', { params }),
+
+  // Get detailed auction info
+  getAuctionDetail: (auctionId) => api.get(`/api/research/treasury/auctions/${auctionId}`),
+
+  // Get yield history for a term
+  getYieldHistory: (securityTerm, years = 5) =>
+    api.get(`/api/research/treasury/history/${encodeURIComponent(securityTerm)}`, {
+      params: { years }
+    }),
+
+  // Get upcoming auctions
+  getUpcoming: () => api.get('/api/research/treasury/upcoming'),
+
+  // Compare yields across terms
+  compareTerms: (terms, years = 5) =>
+    api.get('/api/research/treasury/compare', {
+      params: { terms, years }
+    }),
+
+  // Get snapshot of latest auctions
+  getSnapshot: () => api.get('/api/research/treasury/snapshot'),
+};
+
+// ============================================================================
+// RESEARCH MODULE - BLS CU (Consumer Price Index) Explorer
+// ============================================================================
+
+export const cuResearchAPI = {
+  // Get available dimensions (areas and items)
+  getDimensions: () => api.get('/api/research/bls/cu/dimensions'),
+
+  // Get series list with filters
+  getSeries: (params = {}) => api.get('/api/research/bls/cu/series', { params }),
+
+  // Get time series data for a specific series
+  getSeriesData: (seriesId, params = {}) =>
+    api.get(`/api/research/bls/cu/series/${seriesId}/data`, { params }),
+
+  // Get overview with headline and core CPI
+  getOverview: (areaCode = '0000') =>
+    api.get('/api/research/bls/cu/overview', { params: { area_code: areaCode } }),
+
+  // Get overview timeline
+  getOverviewTimeline: (areaCode = '0000', monthsBack = 12) =>
+    api.get('/api/research/bls/cu/overview/timeline', {
+      params: { area_code: areaCode, months_back: monthsBack }
+    }),
+
+  // Get category analysis
+  getCategoryAnalysis: (areaCode = '0000') =>
+    api.get('/api/research/bls/cu/categories', { params: { area_code: areaCode } }),
+
+  // Get category timeline
+  getCategoryTimeline: (areaCode = '0000', monthsBack = 12) =>
+    api.get('/api/research/bls/cu/categories/timeline', {
+      params: { area_code: areaCode, months_back: monthsBack }
+    }),
+
+  // Compare areas for a given item
+  compareAreas: (itemCode = 'SA0') =>
+    api.get('/api/research/bls/cu/areas/compare', { params: { item_code: itemCode } }),
+
+  // Get area comparison timeline
+  getAreaComparisonTimeline: (itemCode = 'SA0', monthsBack = 12) =>
+    api.get('/api/research/bls/cu/areas/compare/timeline', {
+      params: { item_code: itemCode, months_back: monthsBack }
+    }),
+};
+
+// ============================================================================
+// RESEARCH MODULE - BLS LN (Labor Force Statistics) Explorer
+// ============================================================================
+
+export const lnResearchAPI = {
+  // Get available dimensions (age, sex, race, education, etc.)
+  getDimensions: () => api.get('/api/research/bls/ln/dimensions'),
+
+  // Get series list with filters
+  getSeries: (params = {}) => api.get('/api/research/bls/ln/series', { params }),
+
+  // Get time series data for a specific series
+  getSeriesData: (seriesId, params = {}) =>
+    api.get(`/api/research/bls/ln/series/${seriesId}/data`, { params }),
+
+  // Get overview with headline unemployment, LFPR, and emp-pop ratio
+  getOverview: () => api.get('/api/research/bls/ln/overview'),
+
+  // Get overview timeline
+  getOverviewTimeline: (monthsBack = 24) =>
+    api.get('/api/research/bls/ln/overview/timeline', {
+      params: { months_back: monthsBack }
+    }),
+
+  // Get demographic analysis (age, sex, race, education breakdowns)
+  getDemographicAnalysis: () => api.get('/api/research/bls/ln/demographics'),
+
+  // Get demographic timeline for a specific dimension
+  getDemographicTimeline: (dimensionType, monthsBack = 24) =>
+    api.get('/api/research/bls/ln/demographics/timeline', {
+      params: { dimension_type: dimensionType, months_back: monthsBack }
+    }),
+
+  // Get occupation analysis
+  getOccupationAnalysis: () => api.get('/api/research/bls/ln/occupations'),
+
+  // Get occupation timeline
+  getOccupationTimeline: (monthsBack = 24) =>
+    api.get('/api/research/bls/ln/occupations/timeline', {
+      params: { months_back: monthsBack }
+    }),
+
+  // Get industry analysis
+  getIndustryAnalysis: () => api.get('/api/research/bls/ln/industries'),
+
+  // Get industry timeline
+  getIndustryTimeline: (monthsBack = 24) =>
+    api.get('/api/research/bls/ln/industries/timeline', {
+      params: { months_back: monthsBack }
+    }),
+};
+
+// ============================================================================
+// RESEARCH MODULE - BLS LA (Local Area Unemployment Statistics) Explorer
+// ============================================================================
+
+export const laResearchAPI = {
+  // Get available dimensions (areas and measures)
+  getDimensions: () => api.get('/api/research/bls/la/dimensions'),
+
+  // Get series list with filters
+  getSeries: (params = {}) => api.get('/api/research/bls/la/series', { params }),
+
+  // Get time series data for a specific series
+  getSeriesData: (seriesId, params = {}) =>
+    api.get(`/api/research/bls/la/series/${seriesId}/data`, { params }),
+
+  // Get overview with aggregated national unemployment
+  getOverview: () => api.get('/api/research/bls/la/overview'),
+
+  // Get overview timeline
+  getOverviewTimeline: (monthsBack = 24) =>
+    api.get('/api/research/bls/la/overview/timeline', {
+      params: { months_back: monthsBack }
+    }),
+
+  // Get state analysis (all states, latest snapshot)
+  getStates: () => api.get('/api/research/bls/la/states'),
+
+  // Get state timeline
+  getStatesTimeline: (monthsBack = 24, stateCodes = null) =>
+    api.get('/api/research/bls/la/states/timeline', {
+      params: {
+        months_back: monthsBack,
+        ...(stateCodes && { state_codes: stateCodes })
+      }
+    }),
+
+  // Get metro analysis (metropolitan areas, latest snapshot)
+  getMetros: (limit = 100) =>
+    api.get('/api/research/bls/la/metros', { params: { limit } }),
+
+  // Get metro timeline
+  getMetrosTimeline: (monthsBack = 24, metroCodes = null, limit = 10) =>
+    api.get('/api/research/bls/la/metros/timeline', {
+      params: {
+        months_back: monthsBack,
+        limit,
+        ...(metroCodes && { metro_codes: metroCodes })
+      }
+    }),
+};
+
+// ============================================================================
+// RESEARCH MODULE - BLS CE (Current Employment Statistics) Explorer
+// ============================================================================
+
+export const ceResearchAPI = {
+  // Get available dimensions (industries, supersectors, data types)
+  getDimensions: () => api.get('/api/research/bls/ce/dimensions'),
+
+  // Get series list with filters
+  getSeries: (params = {}) => api.get('/api/research/bls/ce/series', { params }),
+
+  // Get time series data for a specific series
+  getSeriesData: (seriesId, params = {}) =>
+    api.get(`/api/research/bls/ce/series/${seriesId}/data`, { params }),
+
+  // Overview - headline employment stats
+  getOverview: () => api.get('/api/research/bls/ce/overview'),
+
+  // Overview timeline
+  getOverviewTimeline: (monthsBack = 24) =>
+    api.get('/api/research/bls/ce/overview/timeline', {
+      params: { months_back: monthsBack }
+    }),
+
+  // Supersector analysis
+  getSupersectors: () => api.get('/api/research/bls/ce/supersectors'),
+
+  // Supersector timeline
+  getSupersectorsTimeline: (params = {}) =>
+    api.get('/api/research/bls/ce/supersectors/timeline', { params }),
+
+  // Industry analysis
+  getIndustries: (params = {}) =>
+    api.get('/api/research/bls/ce/industries', { params }),
+
+  // Industry timeline
+  getIndustriesTimeline: (industryCodes, monthsBack = 24) =>
+    api.get('/api/research/bls/ce/industries/timeline', {
+      params: { industry_codes: industryCodes, months_back: monthsBack }
+    }),
+
+  // Data type analysis for a specific industry
+  getDataTypes: (industryCode) =>
+    api.get(`/api/research/bls/ce/datatypes/${industryCode}`),
+
+  // Data type timeline for a specific industry
+  getDataTypesTimeline: (industryCode, params = {}) =>
+    api.get(`/api/research/bls/ce/datatypes/${industryCode}/timeline`, { params }),
+
+  // Earnings analysis
+  getEarnings: (params = {}) =>
+    api.get('/api/research/bls/ce/earnings', { params }),
+
+  // Earnings timeline for a specific industry
+  getEarningsTimeline: (industryCode, monthsBack = 24) =>
+    api.get(`/api/research/bls/ce/earnings/${industryCode}/timeline`, {
+      params: { months_back: monthsBack }
+    }),
+};
+
+// ============================================================================
+// RESEARCH MODULE - BLS PC (Producer Price Index - Industry) Explorer
+// ============================================================================
+
+export const pcResearchAPI = {
+  // Get available dimensions (industries and sectors)
+  getDimensions: () => api.get('/api/research/bls/pc/dimensions'),
+
+  // Get series list with filters
+  getSeries: (params = {}) => api.get('/api/research/bls/pc/series', { params }),
+
+  // Get time series data for a specific series
+  getSeriesData: (seriesId, params = {}) =>
+    api.get(`/api/research/bls/pc/series/${seriesId}/data`, { params }),
+
+  // Overview - headline PPI stats (All Commodities, Finished Goods, etc.)
+  getOverview: () => api.get('/api/research/bls/pc/overview'),
+
+  // Overview timeline
+  getOverviewTimeline: (monthsBack = 24) =>
+    api.get('/api/research/bls/pc/overview/timeline', {
+      params: { months_back: monthsBack }
+    }),
+
+  // Sector analysis (NAICS 2-digit sectors)
+  getSectors: () => api.get('/api/research/bls/pc/sectors'),
+
+  // Sector timeline
+  getSectorsTimeline: (monthsBack = 24, sectorCodes = null) =>
+    api.get('/api/research/bls/pc/sectors/timeline', {
+      params: {
+        months_back: monthsBack,
+        ...(sectorCodes && { sector_codes: sectorCodes })
+      }
+    }),
+
+  // Industry analysis (within a sector)
+  getIndustries: (sectorCode = null, limit = 50) =>
+    api.get('/api/research/bls/pc/industries', {
+      params: { sector_code: sectorCode, limit }
+    }),
+
+  // Industry timeline
+  getIndustriesTimeline: (industryCodes, monthsBack = 24) =>
+    api.get('/api/research/bls/pc/industries/timeline', {
+      params: { industry_codes: industryCodes, months_back: monthsBack }
+    }),
+
+  // Product analysis (within an industry)
+  getProducts: (industryCode, limit = 50) =>
+    api.get(`/api/research/bls/pc/products/${industryCode}`, {
+      params: { limit }
+    }),
+
+  // Product timeline
+  getProductsTimeline: (industryCode, productCodes = null, monthsBack = 24) =>
+    api.get(`/api/research/bls/pc/products/${industryCode}/timeline`, {
+      params: {
+        months_back: monthsBack,
+        ...(productCodes && { product_codes: productCodes })
+      }
+    }),
+
+  // Top movers (gainers and losers)
+  getTopMovers: (period = 'mom', limit = 10) =>
+    api.get('/api/research/bls/pc/top-movers', {
+      params: { period, limit }
+    }),
+};
+
 export const formatError = (error) => {
   if (error.response?.data?.detail) {
     return error.response.data.detail;

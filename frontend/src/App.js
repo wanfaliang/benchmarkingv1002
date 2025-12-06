@@ -23,6 +23,14 @@ import DatasetsAdmin from "./pages/DatasetAdmin";
 import CreateDataset from "./pages/CreateDataset";
 import Datahubs from './pages/Datahubs';
 import DatahubBuilder from './pages/DatahubBuilder';
+import TreasuryExplorer from './pages/TreasuryExplorer';
+import Research from './pages/Research';
+import BLSLayout from './layouts/BLSLayout';
+import CUExplorer from './pages/bls/CUExplorer';
+import LNExplorer from './pages/bls/LNExplorer';
+import LAExplorer from './pages/bls/LAExplorer';
+import CEExplorer from './pages/bls/CEExplorer';
+import PCExplorer from './pages/bls/PCExplorer';
 
 function App() {
   return (
@@ -111,6 +119,21 @@ function App() {
           />
           <Route path="/datahubs" element={<ProtectedRoute><Datahubs /></ProtectedRoute>} />
           <Route path="/datahubs/:id" element={<ProtectedRoute><DatahubBuilder /></ProtectedRoute>} />
+
+          {/* Research Module */}
+          <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
+          <Route path="/research/treasury" element={<ProtectedRoute><TreasuryExplorer /></ProtectedRoute>} />
+
+          {/* BLS Research Module - with layout */}
+          <Route path="/research/bls" element={<ProtectedRoute><BLSLayout /></ProtectedRoute>}>
+            <Route path="cu" element={<CUExplorer />} />
+            <Route path="ln" element={<LNExplorer />} />
+            <Route path="la" element={<LAExplorer />} />
+            <Route path="ce" element={<CEExplorer />} />
+            <Route path="pc" element={<PCExplorer />} />
+            {/* More BLS surveys will be added here */}
+          </Route>
+
             {/* Catch all - redirect to home */}
             <Route path="*" element={<Navigate to="/" />} />
             

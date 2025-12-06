@@ -27,12 +27,10 @@ const Header = () => {
 
   const navItems = [
     { label: 'Financial Analysis', path: '/dashboard' },
-    { label: 'Trading Research', path: '/trading' },
-    { label: 'Portfolio', path: '/portfolio' },
+    { label: 'Research', path: '/research' },
     { label: 'Datasets', path: '/datasets' },
     { label: 'Datahub', path: '/datahubs' },
-    { label: 'News', path: '/news' },
-    { label: 'About', path: '/about' },
+    { label: 'Portfolio', path: '/portfolio' },
   ];
 
   // Don't show header on login/register pages

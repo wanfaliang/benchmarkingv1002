@@ -8,6 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import secrets
 from .api import auth, tickers, analyses, websocket, datasets
+from .api.research import treasury as treasury_research
+from .api.research.bls import cu_explorer as cu_research
+from .api.research.bls import ln_explorer as ln_research
+from .api.research.bls import la_explorer as la_research
+from .api.research.bls import ce_explorer as ce_research
+from .api.research.bls import pc_explorer as pc_research
 from .config import settings
 
 import logging
@@ -58,6 +64,14 @@ app.include_router(tickers.router)
 app.include_router(analyses.router)
 app.include_router(websocket.router)
 app.include_router(datasets.router)
+
+# Research module routers (DATA database)
+app.include_router(treasury_research.router)
+app.include_router(cu_research.router)
+app.include_router(ln_research.router)
+app.include_router(la_research.router)
+app.include_router(ce_research.router)
+app.include_router(pc_research.router)
 
 def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
     """

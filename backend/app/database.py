@@ -4,22 +4,69 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from .config import settings
 
-# Create database engine
+
+def get_engine_config(database_url: str):
+    """Get engine configuration based on database URL"""
+    if database_url.startswith("sqlite"):
+        # SQLite-specific settings
+        return {
+            "connect_args": {"check_same_thread": False}
+        }
+    elif database_url.startswith("postgresql"):
+        # PostgreSQL-specific settings
+        return {
+            "pool_size": 5,
+            "max_overflow": 10,
+            "pool_pre_ping": True,  # Verify connections before use
+        }
+    else:
+        return {}
+
+
+# =============================================================================
+# Primary Database (Finexus App - users, analyses, datasets)
+# =============================================================================
+
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args={"check_same_thread": False}  # Needed for SQLite
+    **get_engine_config(settings.DATABASE_URL)
 )
 
-# Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Create Base class for models
 Base = declarative_base()
 
-# Dependency to get DB session
+
 def get_db():
-    """Get database session"""
+    """Get database session for Finexus app database"""
     db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# =============================================================================
+# DATA Database (Read-only - economic, treasury, financial/market data)
+# =============================================================================
+
+data_engine = None
+DataSessionLocal = None
+DataBase = declarative_base()
+
+if settings.DATA_DATABASE_URL:
+    data_engine = create_engine(
+        settings.DATA_DATABASE_URL,
+        **get_engine_config(settings.DATA_DATABASE_URL)
+    )
+    DataSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=data_engine)
+
+
+def get_data_db():
+    """Get database session for DATA database (read-only)"""
+    if DataSessionLocal is None:
+        raise RuntimeError("DATA_DATABASE_URL not configured")
+    db = DataSessionLocal()
     try:
         yield db
     finally:

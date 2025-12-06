@@ -4,9 +4,16 @@ from typing import Optional
 
 class Settings(BaseSettings):
     """Application settings from environment variables"""
-    
-    # Database
-    DATABASE_URL: str = "sqlite:///./financial_analysis.db"
+
+    # Database - set in .env file
+    # PostgreSQL: postgresql://user:password@localhost:5432/finexus_app
+    # SQLite (dev): sqlite:///./financial_analysis.db
+    DATABASE_URL: str
+
+    # DATA project database (read-only access for Research module)
+    # Contains: economic (BEA, BLS), treasury, financial/market data
+    DATA_DATABASE_URL: Optional[str] = None
+
     FRONTEND_URL: str = "http://localhost:3000"
     
     # Security
