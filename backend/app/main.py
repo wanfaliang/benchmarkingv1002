@@ -14,6 +14,20 @@ from .api.research.bls import ln_explorer as ln_research
 from .api.research.bls import la_explorer as la_research
 from .api.research.bls import ce_explorer as ce_research
 from .api.research.bls import pc_explorer as pc_research
+from .api.research.bls import wp_explorer as wp_research
+from .api.research.bls import ap_explorer as ap_research
+from .api.research.bls import cw_explorer as cw_research
+from .api.research.bls import sm_explorer as sm_research
+from .api.research.bls import jt_explorer as jt_research
+from .api.research.bls import oe_explorer as oe_research
+from .api.research.bls import ec_explorer as ec_research
+from .api.research.bls import pr_explorer as pr_research
+from .api.research.bls import tu_explorer as tu_research
+from .api.research.bls import ip_explorer as ip_research
+from .api.research.bls import su_explorer as su_research
+from .api.research.bls import bd_explorer as bd_research
+from .api.research.bls import ei_explorer as ei_research
+from .api.research import portal_api as portal_research
 from .config import settings
 
 import logging
@@ -72,6 +86,22 @@ app.include_router(ln_research.router)
 app.include_router(la_research.router)
 app.include_router(ce_research.router)
 app.include_router(pc_research.router)
+app.include_router(wp_research.router)
+app.include_router(ap_research.router)
+app.include_router(cw_research.router)
+app.include_router(sm_research.router)
+app.include_router(jt_research.router)
+app.include_router(oe_research.router)
+app.include_router(ec_research.router)
+app.include_router(pr_research.router)
+app.include_router(tu_research.router)
+app.include_router(ip_research.router)
+app.include_router(su_research.router)
+app.include_router(bd_research.router)
+app.include_router(ei_research.router)
+
+# Research Portal API
+app.include_router(portal_research.router)
 
 def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
     """

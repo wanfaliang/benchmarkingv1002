@@ -27,6 +27,7 @@ venv/
 /frontend/node_modules/
 /frontend/dist/
 /frontend/.vite/
+/.playwright-mcp/
 
 # Database
 *.db

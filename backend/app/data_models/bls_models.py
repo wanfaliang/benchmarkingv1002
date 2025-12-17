@@ -1398,6 +1398,9 @@ class OEIndustry(Base):
 
     industry_code = Column(String(10), primary_key=True)  # '000000', etc.
     industry_name = Column(String(500), nullable=False)
+    display_level = Column(SmallInteger)
+    selectable = Column(String(1))  # 'T' or 'F'
+    sort_sequence = Column(Integer)
 
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 

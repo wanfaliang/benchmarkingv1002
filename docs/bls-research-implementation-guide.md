@@ -18,7 +18,9 @@ The DATA project (`finexus-data-collector`) is a separate data collection and pr
 ```
 D:\finexus-data-collector
 ```
-
+and official data and introduction files are in its
+\data\bls\{survey}\*.*
+Look into specifically the files {survey}.txt
 ### Useful Resources from DATA
 
 While the DATA project has only implemented explorers for CU, LN, LA, and CE surveys, it contains:
