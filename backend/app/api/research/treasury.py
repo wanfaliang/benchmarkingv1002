@@ -20,6 +20,26 @@ from backend.app.models.user import User
 router = APIRouter(prefix="/api/research/treasury", tags=["Treasury Research"])
 
 
+# ===================== Term Bucket Mapping ===================== #
+# Treasury classifies reopenings with remaining time to maturity
+# e.g., "9-Year 11-Month" is a reopening of a 10-Year Note
+
+# Map benchmark terms to their related reopening patterns
+TERM_BUCKETS = {
+    '2-Year': ['2-Year', '1-Year 11-Month', '1-Year 10-Month', '2-Year 1-Month', '2-Year 2-Month'],
+    '5-Year': ['5-Year', '4-Year 11-Month', '4-Year 10-Month', '5-Year 1-Month', '5-Year 2-Month'],
+    '7-Year': ['7-Year', '6-Year 11-Month', '6-Year 10-Month', '7-Year 1-Month', '7-Year 2-Month'],
+    '10-Year': ['10-Year', '9-Year 11-Month', '9-Year 10-Month', '10-Year 1-Month', '10-Year 2-Month'],
+    '20-Year': ['20-Year', '19-Year 11-Month', '19-Year 10-Month', '20-Year 1-Month', '20-Year 2-Month'],
+    '30-Year': ['30-Year', '29-Year 11-Month', '29-Year 10-Month', '30-Year 1-Month', '30-Year 2-Month'],
+}
+
+
+def get_terms_for_bucket(term: str) -> list:
+    """Get all related terms for a given benchmark term (includes reopenings)."""
+    return TERM_BUCKETS.get(term, [term])
+
+
 # ===================== Response Models ===================== #
 
 class AuctionResponse(BaseModel):
@@ -111,22 +131,28 @@ async def get_term_summaries(
 ):
     """
     Get summary statistics for each security term (2Y, 5Y, 7Y, 10Y, 20Y, 30Y)
+    Includes reopenings in the statistics.
     """
     terms = ['2-Year', '5-Year', '7-Year', '10-Year', '20-Year', '30-Year']
 
     results = []
     for term in terms:
+        # Get all related terms (including reopenings)
+        related_terms = get_terms_for_bucket(term)
+
+        # Get auction count and averages for all related terms
         stats = db.query(
             func.count(TreasuryAuction.auction_id),
             func.avg(TreasuryAuction.bid_to_cover_ratio),
             func.avg(TreasuryAuction.high_yield),
             func.max(TreasuryAuction.auction_date),
         ).filter(
-            TreasuryAuction.security_term == term
+            TreasuryAuction.security_term.in_(related_terms)
         ).first()
 
+        # Get latest yield from any related term
         latest = db.query(TreasuryAuction).filter(
-            TreasuryAuction.security_term == term
+            TreasuryAuction.security_term.in_(related_terms)
         ).order_by(desc(TreasuryAuction.auction_date)).first()
 
         results.append(TermSummaryResponse(
@@ -146,18 +172,32 @@ async def get_auctions(
     security_term: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    include_reopenings: bool = Query(True, description="Include reopenings for benchmark terms"),
+    completed_only: bool = Query(True, description="Only return completed auctions with yield data"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_data_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get list of Treasury auctions with optional filters
+    Get list of Treasury auctions with optional filters.
+    When include_reopenings=True (default), benchmark terms like '10-Year'
+    will also return reopenings like '9-Year 11-Month'.
+    When completed_only=True (default), only returns auctions with actual yield data.
     """
     query = db.query(TreasuryAuction)
 
+    # Filter to completed auctions only (have yield data)
+    if completed_only:
+        query = query.filter(TreasuryAuction.high_yield.isnot(None))
+
     if security_term:
-        query = query.filter(TreasuryAuction.security_term == security_term)
+        if include_reopenings:
+            # Get all related terms including reopenings
+            related_terms = get_terms_for_bucket(security_term)
+            query = query.filter(TreasuryAuction.security_term.in_(related_terms))
+        else:
+            query = query.filter(TreasuryAuction.security_term == security_term)
     if start_date:
         query = query.filter(TreasuryAuction.auction_date >= start_date)
     if end_date:
@@ -237,16 +277,25 @@ async def get_auction_detail(
 async def get_yield_history(
     security_term: str,
     years: int = Query(5, ge=1, le=20),
+    include_reopenings: bool = Query(True, description="Include reopenings for benchmark terms"),
     db: Session = Depends(get_data_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get yield history for a specific security term
+    Get yield history for a specific security term.
+    When include_reopenings=True (default), includes reopenings in the history.
     """
     cutoff_date = date.today() - timedelta(days=years * 365)
 
+    # Get related terms if including reopenings
+    if include_reopenings:
+        related_terms = get_terms_for_bucket(security_term)
+        query_filter = TreasuryAuction.security_term.in_(related_terms)
+    else:
+        query_filter = TreasuryAuction.security_term == security_term
+
     auctions = db.query(TreasuryAuction).filter(
-        TreasuryAuction.security_term == security_term,
+        query_filter,
         TreasuryAuction.auction_date >= cutoff_date
     ).order_by(TreasuryAuction.auction_date).all()
 
@@ -330,18 +379,27 @@ async def get_auction_snapshot(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get snapshot of latest auction for each term (for dashboard cards)
+    Get snapshot of latest COMPLETED auction for each term (for dashboard cards).
+    Includes reopenings when finding the latest auction.
+    Only returns auctions with actual yield data (excludes scheduled/future auctions).
     """
     terms = ['2-Year', '5-Year', '7-Year', '10-Year', '20-Year', '30-Year']
 
     result = []
     for term in terms:
+        # Get all related terms (including reopenings)
+        related_terms = get_terms_for_bucket(term)
+
+        # Get latest COMPLETED auction (has yield data) from any related term
         latest = db.query(TreasuryAuction).filter(
-            TreasuryAuction.security_term == term
+            TreasuryAuction.security_term.in_(related_terms),
+            TreasuryAuction.high_yield.isnot(None)  # Only completed auctions
         ).order_by(desc(TreasuryAuction.auction_date)).first()
 
+        # Get previous completed auction for comparison
         previous = db.query(TreasuryAuction).filter(
-            TreasuryAuction.security_term == term
+            TreasuryAuction.security_term.in_(related_terms),
+            TreasuryAuction.high_yield.isnot(None)
         ).order_by(desc(TreasuryAuction.auction_date)).offset(1).first()
 
         if latest:
@@ -350,7 +408,8 @@ async def get_auction_snapshot(
                 yield_change = float(latest.high_yield) - float(previous.high_yield)
 
             result.append({
-                "security_term": term,
+                "security_term": term,  # Benchmark term for display
+                "actual_term": latest.security_term,  # Actual term from auction
                 "auction_date": latest.auction_date.isoformat(),
                 "high_yield": float(latest.high_yield) if latest.high_yield else None,
                 "bid_to_cover_ratio": float(latest.bid_to_cover_ratio) if latest.bid_to_cover_ratio else None,

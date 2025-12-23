@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     # Contains: economic (BEA, BLS), treasury, financial/market data
     DATA_DATABASE_URL: Optional[str] = None
 
+    # DATA database connection pool settings (for high-concurrency queries like BEA 50 states)
+    DATA_DB_POOL_SIZE: int = 20
+    DATA_DB_MAX_OVERFLOW: int = 10
+    DATA_DB_POOL_RECYCLE: int = 3600
+
     FRONTEND_URL: str = "http://localhost:3000"
     
     # Security
@@ -25,6 +30,7 @@ class Settings(BaseSettings):
     # API Keys
     FMP_API_KEY: Optional[str] = None
     FRED_API_KEY: Optional[str] = None
+    FINNHUB_API_KEY: Optional[str] = None
     
     # File Storage
     DATA_DIR: str = "./data"

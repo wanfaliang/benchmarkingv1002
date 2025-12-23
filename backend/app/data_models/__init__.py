@@ -76,6 +76,13 @@ from .treasury_models import (
     TreasuryAuctionSchedule,
 )
 
+# FRED Models
+from .fred_models import (
+    FredSeries,
+    FredObservationLatest,
+    FredObservationRealtime,
+)
+
 # BLS Models - Reference Tables
 from .bls_models import (
     BLSSurvey,
@@ -283,6 +290,10 @@ __all__ = [
     "TreasuryUpcomingAuction",
     "TreasuryDailyRate",
     "TreasuryAuctionSchedule",
+    # FRED
+    "FredSeries",
+    "FredObservationLatest",
+    "FredObservationRealtime",
     # BLS
     "BLSSurvey",
     "BLSArea",

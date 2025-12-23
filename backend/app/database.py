@@ -55,9 +55,13 @@ DataSessionLocal = None
 DataBase = declarative_base()
 
 if settings.DATA_DATABASE_URL:
+    # Use configurable pool settings for high-concurrency queries (BEA 50 states, etc.)
     data_engine = create_engine(
         settings.DATA_DATABASE_URL,
-        **get_engine_config(settings.DATA_DATABASE_URL)
+        pool_size=settings.DATA_DB_POOL_SIZE,
+        max_overflow=settings.DATA_DB_MAX_OVERFLOW,
+        pool_pre_ping=True,
+        pool_recycle=settings.DATA_DB_POOL_RECYCLE,
     )
     DataSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=data_engine)
 

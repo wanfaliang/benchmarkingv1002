@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -24,8 +25,10 @@ import CreateDataset from "./pages/CreateDataset";
 import Datahubs from './pages/Datahubs';
 import DatahubBuilder from './pages/DatahubBuilder';
 import TreasuryExplorer from './pages/TreasuryExplorer';
+import EconomicCalendar from './pages/EconomicCalendar';
 import Research from './pages/Research';
 import BLSLayout from './layouts/BLSLayout';
+import BEALayout from './layouts/BEALayout';
 import CUExplorer from './pages/bls/CUExplorer';
 import LNExplorer from './pages/bls/LNExplorer';
 import LAExplorer from './pages/bls/LAExplorer';
@@ -45,11 +48,29 @@ import SUExplorer from './pages/bls/SUExplorer';
 import BDExplorer from './pages/bls/BDExplorer';
 import EIExplorer from './pages/bls/EIExplorer';
 
+// BEA Explorer Pages
+import NIPAExplorer from './pages/NIPAExplorer';
+import RegionalExplorer from './pages/RegionalExplorer';
+import GDPbyIndustryExplorer from './pages/GDPbyIndustryExplorer';
+import ITAExplorer from './pages/ITAExplorer';
+import FixedAssetsExplorer from './pages/FixedAssetsExplorer';
+
+// Create a client for react-query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+    },
+  },
+});
+
 function App(): React.ReactElement {
   return (
-    <AuthProvider>
-      <ThemeProvider>
-        <Router>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ThemeProvider>
+          <Router>
           <Header />
           <Routes>
             {/* Public routes */}
@@ -134,6 +155,16 @@ function App(): React.ReactElement {
             {/* Research Module */}
             <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
             <Route path="/research/treasury" element={<ProtectedRoute><TreasuryExplorer /></ProtectedRoute>} />
+            <Route path="/research/calendar" element={<ProtectedRoute><EconomicCalendar /></ProtectedRoute>} />
+
+            {/* BEA Research Module - with layout */}
+            <Route path="/research/bea" element={<ProtectedRoute><BEALayout /></ProtectedRoute>}>
+              <Route path="nipa" element={<NIPAExplorer />} />
+              <Route path="regional" element={<RegionalExplorer />} />
+              <Route path="gdpbyindustry" element={<GDPbyIndustryExplorer />} />
+              <Route path="ita" element={<ITAExplorer />} />
+              <Route path="fixedassets" element={<FixedAssetsExplorer />} />
+            </Route>
 
             {/* BLS Research Module - with layout */}
             <Route path="/research/bls" element={<ProtectedRoute><BLSLayout /></ProtectedRoute>}>
@@ -162,9 +193,10 @@ function App(): React.ReactElement {
 
           </Routes>
           <Footer />
-        </Router>
-      </ThemeProvider>
-    </AuthProvider>
+          </Router>
+        </ThemeProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

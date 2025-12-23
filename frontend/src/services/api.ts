@@ -418,6 +418,48 @@ export const treasuryResearchAPI = {
 };
 
 // ============================================================================
+// Research Module - FRED Explorer (Treasury Yield Curve)
+// ============================================================================
+
+export const fredResearchAPI = {
+  getYieldCurve: <T = unknown>(asOfDate?: string): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/yield-curve', { params: asOfDate ? { as_of_date: asOfDate } : {} }),
+
+  getYieldHistory: <T = unknown>(tenor: string = '10Y', days: number = 365): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/yield-curve/history', { params: { tenor, days } }),
+
+  getSpreadHistory: <T = unknown>(spread: string = '2s10s', days: number = 365): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/yield-curve/spread-history', { params: { spread, days } }),
+};
+
+// ============================================================================
+// Research Module - Market Indices (S&P 500, Nasdaq, DJIA, Russell 2000)
+// ============================================================================
+
+export const marketResearchAPI = {
+  getIndices: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/market/indices'),
+
+  getIndexHistory: <T = unknown>(symbol: string, days: number = 30): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/market/indices/${symbol}/history`, { params: { days } }),
+};
+
+// ============================================================================
+// Research Module - Economic Calendar
+// ============================================================================
+
+export const economicCalendarAPI = {
+  getUpcoming: <T = unknown>(params: { days?: number; country?: string; impact?: string; limit?: number } = {}): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/calendar/upcoming', { params }),
+
+  getRecent: <T = unknown>(params: { days?: number; country?: string; impact?: string; limit?: number } = {}): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/calendar/recent', { params }),
+
+  getThisWeek: <T = unknown>(country?: string): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/calendar/week', { params: country ? { country } : {} }),
+};
+
+// ============================================================================
 // Research Module - BLS CU (Consumer Price Index) Explorer
 // ============================================================================
 
@@ -2677,6 +2719,315 @@ export const eiResearchAPI = {
         ...(limit && { limit }),
         ...(year && { year }),
         ...(period && { period }),
+      },
+    }),
+};
+
+// ============================================================================
+// BEA (Bureau of Economic Analysis) Research API
+// ============================================================================
+
+export const beaResearchAPI = {
+  // NIPA endpoints
+  getNIPATables: <T = unknown>(activeOnly?: boolean): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/nipa/tables', {
+      params: { ...(activeOnly !== undefined && { active_only: activeOnly }) },
+    }),
+
+  getNIPATable: <T = unknown>(tableName: string): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/bea/nipa/tables/${tableName}`),
+
+  getNIPASeries: <T = unknown>(tableName: string): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/bea/nipa/tables/${tableName}/series`),
+
+  getNIPASeriesData: <T = unknown>(
+    seriesCode: string,
+    startYear?: number,
+    endYear?: number,
+    frequency?: string
+  ): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/bea/nipa/series/${seriesCode}/data`, {
+      params: {
+        ...(startYear && { start_year: startYear }),
+        ...(endYear && { end_year: endYear }),
+        ...(frequency && { frequency }),
+      },
+    }),
+
+  getNIPAHeadline: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/nipa/headline'),
+
+  // Regional endpoints
+  getRegionalTables: <T = unknown>(activeOnly?: boolean): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/regional/tables', {
+      params: { ...(activeOnly !== undefined && { active_only: activeOnly }) },
+    }),
+
+  getRegionalLineCodes: <T = unknown>(tableName: string): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/bea/regional/tables/${tableName}/linecodes`),
+
+  getRegionalGeographies: <T = unknown>(geoType?: string): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/regional/geographies', {
+      params: { ...(geoType && { geo_type: geoType }) },
+    }),
+
+  getRegionalData: <T = unknown>(
+    tableName: string,
+    lineCode: number,
+    geoFips: string,
+    startYear?: number,
+    endYear?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/regional/data', {
+      params: {
+        table_name: tableName,
+        line_code: lineCode,
+        geo_fips: geoFips,
+        ...(startYear && { start_year: startYear }),
+        ...(endYear && { end_year: endYear }),
+      },
+    }),
+
+  // Batch endpoint - fetches all states in ONE query (50x more efficient)
+  getRegionalDataBatch: <T = unknown>(
+    tableName: string,
+    lineCode: number,
+    geoFipsList: string[],
+    startYear?: number,
+    endYear?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/regional/data/batch', {
+      params: {
+        table_name: tableName,
+        line_code: lineCode,
+        geo_fips_list: geoFipsList.join(','),
+        ...(startYear && { start_year: startYear }),
+        ...(endYear && { end_year: endYear }),
+      },
+    }),
+
+  getRegionalSnapshot: <T = unknown>(
+    tableName?: string,
+    lineCode?: number,
+    geoType?: string,
+    year?: number,
+    limit?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/regional/snapshot', {
+      params: {
+        ...(tableName && { table_name: tableName }),
+        ...(lineCode && { line_code: lineCode }),
+        ...(geoType && { geo_type: geoType }),
+        ...(year && { year }),
+        ...(limit && { limit }),
+      },
+    }),
+
+  // GDP by Industry endpoints
+  getGDPByIndustryTables: <T = unknown>(activeOnly?: boolean): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/gdpbyindustry/tables', {
+      params: { ...(activeOnly !== undefined && { active_only: activeOnly }) },
+    }),
+
+  getGDPByIndustryIndustries: <T = unknown>(
+    parentCode?: string,
+    level?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/gdpbyindustry/industries', {
+      params: {
+        ...(parentCode && { parent_code: parentCode }),
+        ...(level && { level }),
+      },
+    }),
+
+  getGDPByIndustryData: <T = unknown>(
+    tableId: number,
+    industryCode: string,
+    frequency?: string,
+    startYear?: number,
+    endYear?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/gdpbyindustry/data', {
+      params: {
+        table_id: tableId,
+        industry_code: industryCode,
+        ...(frequency && { frequency }),
+        ...(startYear && { start_year: startYear }),
+        ...(endYear && { end_year: endYear }),
+      },
+    }),
+
+  getGDPByIndustrySnapshot: <T = unknown>(
+    tableId?: number,
+    frequency?: string,
+    year?: number,
+    quarter?: string,
+    limit?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/gdpbyindustry/snapshot', {
+      params: {
+        ...(tableId && { table_id: tableId }),
+        ...(frequency && { frequency }),
+        ...(year && { year }),
+        ...(quarter && { quarter }),
+        ...(limit && { limit }),
+      },
+    }),
+
+  // ITA (International Trade and Investment) endpoints
+  getITAIndicators: <T = unknown>(activeOnly?: boolean): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/ita/indicators', {
+      params: { ...(activeOnly !== undefined && { active_only: activeOnly }) },
+    }),
+
+  getITAAreas: <T = unknown>(
+    areaType?: string,
+    activeOnly?: boolean
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/ita/areas', {
+      params: {
+        ...(areaType && { area_type: areaType }),
+        ...(activeOnly !== undefined && { active_only: activeOnly }),
+      },
+    }),
+
+  getITAData: <T = unknown>(
+    indicatorCode: string,
+    areaCode: string,
+    frequency?: string,
+    startYear?: number,
+    endYear?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/ita/data', {
+      params: {
+        indicator_code: indicatorCode,
+        area_code: areaCode,
+        ...(frequency && { frequency }),
+        ...(startYear && { start_year: startYear }),
+        ...(endYear && { end_year: endYear }),
+      },
+    }),
+
+  getITAHeadline: <T = unknown>(year?: number): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/ita/headline', {
+      params: { ...(year && { year }) },
+    }),
+
+  getITASnapshot: <T = unknown>(
+    indicatorCode?: string,
+    areaType?: string,
+    year?: number,
+    limit?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/ita/snapshot', {
+      params: {
+        ...(indicatorCode && { indicator_code: indicatorCode }),
+        ...(areaType && { area_type: areaType }),
+        ...(year && { year }),
+        ...(limit && { limit }),
+      },
+    }),
+
+  // Fixed Assets endpoints
+  getFixedAssetsTables: <T = unknown>(activeOnly?: boolean): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/fixedassets/tables', {
+      params: { ...(activeOnly !== undefined && { active_only: activeOnly }) },
+    }),
+
+  getFixedAssetsSeries: <T = unknown>(tableName: string): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/bea/fixedassets/tables/${tableName}/series`),
+
+  getFixedAssetsSeriesData: <T = unknown>(
+    seriesCode: string,
+    startYear?: number,
+    endYear?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/bea/fixedassets/series/${seriesCode}/data`, {
+      params: {
+        ...(startYear && { start_year: startYear }),
+        ...(endYear && { end_year: endYear }),
+      },
+    }),
+
+  getFixedAssetsHeadline: <T = unknown>(year?: number): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/fixedassets/headline', {
+      params: { ...(year && { year }) },
+    }),
+
+  getFixedAssetsSnapshot: <T = unknown>(
+    tableName?: string,
+    year?: number,
+    limit?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/fixedassets/snapshot', {
+      params: {
+        ...(tableName && { table_name: tableName }),
+        ...(year && { year }),
+        ...(limit && { limit }),
+      },
+    }),
+
+  // ========== BATCH ENDPOINTS FOR IMPROVED PERFORMANCE ==========
+
+  // Fixed Assets batch - get multiple series in one call
+  getFixedAssetsDataBatch: <T = unknown>(
+    seriesCodes: string[],
+    startYear?: number,
+    endYear?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/fixedassets/data/batch', {
+      params: {
+        series_codes: seriesCodes.join(','),
+        ...(startYear && { start_year: startYear }),
+        ...(endYear && { end_year: endYear }),
+      },
+    }),
+
+  // NIPA batch - get multiple series in one call
+  getNIPADataBatch: <T = unknown>(
+    seriesCodes: string[],
+    startYear?: number,
+    endYear?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/nipa/data/batch', {
+      params: {
+        series_codes: seriesCodes.join(','),
+        ...(startYear && { start_year: startYear }),
+        ...(endYear && { end_year: endYear }),
+      },
+    }),
+
+  // GDP by Industry batch - get multiple industries in one call
+  getGDPByIndustryDataBatch: <T = unknown>(
+    tableId: number,
+    industryCodes: string[],
+    yearType?: string,
+    startYear?: number,
+    endYear?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/gdpbyindustry/data/batch', {
+      params: {
+        table_id: tableId,
+        industry_codes: industryCodes.join(','),
+        ...(yearType && { year_type: yearType }),
+        ...(startYear && { start_year: startYear }),
+        ...(endYear && { end_year: endYear }),
+      },
+    }),
+
+  // ITA batch - get multiple areas in one call
+  getITADataBatch: <T = unknown>(
+    indicator: string,
+    areaCodes: string[],
+    startYear?: number,
+    endYear?: number
+  ): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/bea/ita/data/batch', {
+      params: {
+        indicator,
+        area_codes: areaCodes.join(','),
+        ...(startYear && { start_year: startYear }),
+        ...(endYear && { end_year: endYear }),
       },
     }),
 };

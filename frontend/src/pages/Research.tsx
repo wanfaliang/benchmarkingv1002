@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   AreaChart,
@@ -41,6 +42,11 @@ import {
   wpResearchAPI,
   pcResearchAPI,
   jtResearchAPI,
+  treasuryResearchAPI,
+  fredResearchAPI,
+  marketResearchAPI,
+  economicCalendarAPI,
+  beaResearchAPI,
 } from '../services/api';
 import { ChevronLeft } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
@@ -287,33 +293,8 @@ interface CarouselData {
 // SAMPLE DATA - Would come from API
 // ============================================================================
 
-const marketData = {
-  indices: [
-    { name: 'S&P 500', value: 6090.27, change: -0.54, data: [6050, 6080, 6070, 6095, 6085, 6090] },
-    { name: 'Nasdaq', value: 19859.77, change: -0.66, data: [19700, 19800, 19750, 19900, 19850, 19860] },
-    { name: 'DJIA', value: 44642.52, change: -0.20, data: [44500, 44600, 44550, 44700, 44650, 44642] },
-    { name: 'Russell 2000', value: 2393.67, change: 0.42, data: [2370, 2380, 2375, 2390, 2385, 2394] },
-  ],
-  yields: [
-    { maturity: '2Y', yield: 4.15, change: -0.03, weekAgo: 4.27 },
-    { maturity: '5Y', yield: 4.05, change: -0.04, weekAgo: 4.20 },
-    { maturity: '10Y', yield: 4.18, change: -0.05, weekAgo: 4.32 },
-    { maturity: '30Y', yield: 4.36, change: -0.04, weekAgo: 4.46 },
-  ],
-  yieldCurve: [
-    { term: '1M', yield: 4.62 },
-    { term: '3M', yield: 4.55 },
-    { term: '6M', yield: 4.42 },
-    { term: '1Y', yield: 4.25 },
-    { term: '2Y', yield: 4.15 },
-    { term: '3Y', yield: 4.08 },
-    { term: '5Y', yield: 4.05 },
-    { term: '7Y', yield: 4.10 },
-    { term: '10Y', yield: 4.18 },
-    { term: '20Y', yield: 4.45 },
-    { term: '30Y', yield: 4.36 },
-  ],
-};
+// Market indices now fetched from real API in MarketTickerBar
+// Treasury yields now fetched from real API in YieldCurveCard and MarketTickerBar
 
 const laborData = {
   headline: {
@@ -365,33 +346,9 @@ const inflationData = {
   ],
 };
 
-const gdpData = {
-  current: { value: 2.8, prior: 3.0, unit: '% SAAR' },
-  components: [
-    { name: 'Consumption', contribution: 2.37, pct: 85 },
-    { name: 'Investment', contribution: 0.52, pct: 19 },
-    { name: 'Government', contribution: 0.43, pct: 15 },
-    { name: 'Net Exports', contribution: -0.52, pct: -19 },
-  ],
-  trend: [
-    { q: 'Q1 23', value: 2.2 },
-    { q: 'Q2 23', value: 2.1 },
-    { q: 'Q3 23', value: 4.9 },
-    { q: 'Q4 23', value: 3.4 },
-    { q: 'Q1 24', value: 1.4 },
-    { q: 'Q2 24', value: 3.0 },
-    { q: 'Q3 24', value: 2.8 },
-  ],
-};
+// GDP data is now fetched from real NIPA API in GDPCard component
 
-const calendarEvents = [
-  { date: 'Dec 11', time: '8:30 AM', name: 'CPI', source: 'BLS', importance: 3 },
-  { date: 'Dec 11', time: '1:00 PM', name: '10Y Auction', source: 'Treasury', importance: 2 },
-  { date: 'Dec 12', time: '8:30 AM', name: 'PPI', source: 'BLS', importance: 2 },
-  { date: 'Dec 12', time: '1:00 PM', name: '30Y Auction', source: 'Treasury', importance: 2 },
-  { date: 'Dec 18', time: '2:00 PM', name: 'FOMC', source: 'Fed', importance: 3 },
-  { date: 'Jan 10', time: '8:30 AM', name: 'Employment', source: 'BLS', importance: 3 },
-];
+// Economic calendar events now fetched from real API in CalendarCard
 
 // ============================================================================
 // MICRO COMPONENTS - Sparklines & Indicators
@@ -485,33 +442,173 @@ void _DataPill; // Suppress unused warning
 // ============================================================================
 
 function MarketTickerBar() {
+  const [indicesData, setIndicesData] = useState<MarketIndicesData | null>(null);
+
+  // Use React Query for FRED data - shared cache across components
+  const { data: fredData } = useQuery({
+    queryKey: ['fred-yield-curve'],
+    queryFn: async () => {
+      const res = await fredResearchAPI.getYieldCurve<FredYieldCurveData>();
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - FRED data doesn't change often
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 min
+  });
+
+  // Use React Query for indices data
+  const { data: initialIndices } = useQuery({
+    queryKey: ['market-indices'],
+    queryFn: async () => {
+      const res = await marketResearchAPI.getIndices<MarketIndicesData>();
+      return res.data;
+    },
+    staleTime: 30 * 1000, // 30 seconds for market data
+  });
+
+  // Update indicesData from query or WebSocket
+  useEffect(() => {
+    if (initialIndices && !indicesData) {
+      setIndicesData(initialIndices);
+    }
+  }, [initialIndices, indicesData]);
+
+  useEffect(() => {
+
+    // Connect to WebSocket for real-time updates
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.hostname === 'localhost' ? 'localhost:8000' : 'api.finexus.net';
+    const wsUrl = `${wsProtocol}//${wsHost}/api/research/market/ws/indices`;
+
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+
+    const connectWebSocket = () => {
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log('WebSocket connected for real-time indices');
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'indices_update' && message.data) {
+            // Convert WebSocket data to MarketIndicesData format
+            const indices = Object.entries(message.data).map(([symbol, data]: [string, any]) => ({
+              symbol,
+              name: { '^GSPC': 'S&P 500', '^IXIC': 'Nasdaq', '^DJI': 'DJIA', '^RUT': 'Russell 2000' }[symbol] || symbol,
+              price: data.price,
+              change: data.change,
+              change_pct: data.change_pct,
+              date: null,
+              sparkline: [],
+              source: data.source,
+              is_realtime: data.source === 'realtime',
+            }));
+
+            setIndicesData(prev => ({
+              as_of: message.timestamp || new Date().toISOString(),
+              market_status: message.market_status || prev?.market_status || 'unknown',
+              indices: indices.length > 0 ? indices : (prev?.indices || []),
+            }));
+          } else if (message.type === 'ping') {
+            // Respond to ping with pong
+            ws?.send(JSON.stringify({ type: 'pong' }));
+          }
+        } catch (e) {
+          console.error('Failed to parse WebSocket message:', e);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected, reconnecting in 5s...');
+        reconnectTimeout = setTimeout(connectWebSocket, 5000);
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+    };
+  }, []);
+
+  // Get 10Y yield for display
+  const yield10Y = fredData?.curve?.find(d => d.tenor === '10Y');
+
+  // Get spreads from FRED data
+  const spread2s10s = fredData?.spreads?.['2s10s'];
+  const isSpreadPositive = spread2s10s != null && spread2s10s > 0;
+
+  // Market status indicator
+  const marketStatus = indicesData?.market_status;
+  const isRealtime = indicesData?.indices?.some(idx => idx.is_realtime);
+
   return (
     <div className="bg-gray-900 text-white">
       <div className="max-w-[1800px] mx-auto">
         <div className="flex items-center divide-x divide-gray-700 overflow-x-auto">
-          {marketData.indices.map((idx, i) => (
+          {/* Market Status Indicator */}
+          <div className="flex items-center gap-2 px-4 py-2 min-w-fit">
+            <div className={`w-2 h-2 rounded-full ${
+              marketStatus === 'open' ? 'bg-green-500 animate-pulse' :
+              marketStatus === 'pre-market' ? 'bg-yellow-500' :
+              marketStatus === 'after-hours' ? 'bg-orange-500' :
+              'bg-gray-500'
+            }`} />
+            <span className="text-[10px] text-gray-400 uppercase">
+              {marketStatus === 'open' ? (isRealtime ? 'Live' : 'Open') :
+               marketStatus === 'pre-market' ? 'Pre-Mkt' :
+               marketStatus === 'after-hours' ? 'After-Hrs' :
+               'Closed'}
+            </span>
+          </div>
+          {indicesData?.indices?.map((idx, i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-2 min-w-fit">
               <div>
                 <div className="text-[10px] text-gray-400 uppercase tracking-wide">{idx.name}</div>
-                <div className="text-sm font-medium">{idx.value.toLocaleString()}</div>
+                <div className="text-sm font-medium">
+                  {idx.price != null ? idx.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}
+                </div>
               </div>
-              <MiniSparkline data={idx.data} color="auto" width={50} height={20} />
-              <ChangeIndicator value={idx.change} />
+              {idx.sparkline && idx.sparkline.length > 0 && (
+                <MiniSparkline data={idx.sparkline} color="auto" width={50} height={20} />
+              )}
+              {idx.change_pct != null && <ChangeIndicator value={idx.change_pct} />}
             </div>
           ))}
           <div className="flex items-center gap-3 px-4 py-2 min-w-fit">
             <div>
               <div className="text-[10px] text-gray-400 uppercase tracking-wide">10Y Yield</div>
-              <div className="text-sm font-medium">{marketData.yields[2].yield}%</div>
+              <div className="text-sm font-medium">
+                {yield10Y?.yield != null ? `${yield10Y.yield.toFixed(2)}%` : '--'}
+              </div>
             </div>
-            <ChangeIndicator value={marketData.yields[2].change} suffix=" bps" />
+            {yield10Y?.daily_change_bps != null && (
+              <ChangeIndicator value={yield10Y.daily_change_bps} suffix=" bp" />
+            )}
           </div>
           <div className="flex items-center gap-3 px-4 py-2 min-w-fit">
             <div>
               <div className="text-[10px] text-gray-400 uppercase tracking-wide">2s10s</div>
-              <div className="text-sm font-medium text-emerald-400">+3 bps</div>
+              <div className={`text-sm font-medium ${isSpreadPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                {spread2s10s != null ? `${isSpreadPositive ? '+' : ''}${spread2s10s} bp` : '--'}
+              </div>
             </div>
-            <span className="text-[10px] text-gray-500">First positive since Jul '22</span>
+            {spread2s10s != null && (
+              <span className="text-[10px] text-gray-500">
+                {isSpreadPositive ? 'Curve normal' : 'Curve inverted'}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -520,42 +617,144 @@ function MarketTickerBar() {
 }
 
 function YieldCurveCard() {
+  // Use React Query with same key as MarketTickerBar - automatic deduplication!
+  const { data: curveData, isLoading: loading } = useQuery({
+    queryKey: ['fred-yield-curve'],
+    queryFn: async () => {
+      const res = await fredResearchAPI.getYieldCurve<FredYieldCurveData>();
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000,
+  });
+
+  // Build chart data from FRED curve
+  const chartData = curveData?.curve?.filter(p => p.yield !== null).map(p => ({
+    tenor: p.tenor,
+    yield: p.yield,
+  })) || [];
+
+  // Key yields to display (2Y, 5Y, 10Y, 30Y)
+  const keyTenors = ['2Y', '5Y', '10Y', '30Y'];
+  const keyYields = keyTenors.map(tenor => {
+    const point = curveData?.curve?.find(p => p.tenor === tenor);
+    return {
+      tenor,
+      yield: point?.yield,
+      change: point?.daily_change_bps,
+    };
+  });
+
+  // Format date
+  const asOfDate = curveData?.as_of_date;
+  const formattedDate = asOfDate ? new Date(asOfDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+
+  // Calculate Y-axis domain
+  const yields = chartData.map(d => d.yield).filter((y): y is number => y !== null);
+  const minYield = yields.length > 0 ? Math.floor(Math.min(...yields) * 10) / 10 - 0.2 : 3.0;
+  const maxYield = yields.length > 0 ? Math.ceil(Math.max(...yields) * 10) / 10 + 0.2 : 5.0;
+
+  // Get key spreads
+  const spread2s10s = curveData?.spreads?.['2s10s'];
+
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-gray-900 text-sm">Treasury Yield Curve</h3>
-        <span className="text-xs text-gray-500">Updated 4:00 PM ET</span>
+    <div className="bg-white rounded-lg border border-gray-200 p-3">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <h3 className="font-medium text-gray-700 text-xs">Treasury Yield Curve</h3>
+          {spread2s10s !== undefined && (
+            <span className={`text-[9px] px-1.5 py-0.5 rounded ${
+              spread2s10s >= 0 ? 'bg-teal-50 text-teal-600' : 'bg-rose-50 text-rose-600'
+            }`}>
+              2s10s {spread2s10s >= 0 ? '+' : ''}{spread2s10s}bp
+            </span>
+          )}
+        </div>
+        {formattedDate && (
+          <span className="text-[9px] text-gray-400">{formattedDate}</span>
+        )}
       </div>
-      <div className="h-32">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={marketData.yieldCurve} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
-            <defs>
-              <linearGradient id="yieldGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis dataKey="term" tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-            <YAxis domain={[3.8, 4.8]} tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={30} />
-            <Tooltip
-              contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }}
-              formatter={(value: number) => [`${value}%`, 'Yield']}
-            />
-            <Area type="monotone" dataKey="yield" stroke="#6366f1" fill="url(#yieldGradient)" strokeWidth={2} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100">
-        {marketData.yields.map((y, i) => (
-          <div key={i} className="text-center flex-1">
-            <div className="text-[10px] text-gray-500">{y.maturity}</div>
-            <div className="text-sm font-semibold text-gray-900">{y.yield}%</div>
-            <div className={`text-[10px] ${y.change >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-              {y.change >= 0 ? '+' : ''}{y.change}
-            </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-56">
+          <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          {/* Chart - More prominent */}
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 5, left: 0 }}>
+                <defs>
+                  <linearGradient id="yieldCurveGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.4} />
+                    <stop offset="50%" stopColor="#34d399" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#6ee7b7" stopOpacity={0.05} />
+                  </linearGradient>
+                </defs>
+                <XAxis
+                  dataKey="tenor"
+                  tick={{ fontSize: 9, fill: '#6b7280' }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={0}
+                />
+                <YAxis
+                  domain={[minYield, maxYield]}
+                  tick={{ fontSize: 9, fill: '#9ca3af' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={32}
+                  tickFormatter={(v) => `${v.toFixed(1)}%`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 11,
+                    borderRadius: 8,
+                    border: 'none',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    padding: '8px 12px'
+                  }}
+                  formatter={(value: number) => [`${value?.toFixed(3)}%`, 'Yield']}
+                  labelFormatter={(label) => `${label} Treasury`}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="yield"
+                  stroke="#059669"
+                  fill="url(#yieldCurveGradient)"
+                  strokeWidth={2.5}
+                  dot={false}
+                  activeDot={{ r: 4, fill: '#059669', stroke: '#fff', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-        ))}
-      </div>
+
+          {/* Key Yields - Compact inline */}
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 px-1">
+            {keyYields.map((y, i) => (
+              <div key={i} className="text-center">
+                <span className="text-[10px] text-gray-400">{y.tenor}</span>
+                <span className="text-xs text-gray-600 ml-1">
+                  {y.yield != null ? `${y.yield.toFixed(2)}%` : '--'}
+                </span>
+                {y.change != null && y.change !== 0 && (
+                  <span className={`text-[9px] ml-0.5 ${y.change > 0 ? 'text-rose-500' : 'text-teal-500'}`}>
+                    {y.change > 0 ? '↑' : '↓'}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Link to Treasury Explorer */}
+          <Link to="/research/treasury" className="block mt-2 pt-2 text-center text-xs text-indigo-600 hover:text-indigo-700 font-medium border-t border-gray-100">
+            Treasury Explorer →
+          </Link>
+        </>
+      )}
     </div>
   );
 }
@@ -793,7 +992,7 @@ function JOLTSCard() {
 
 function InflationCard() {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[400px]">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <DollarSign className="w-4 h-4 text-red-500" />
@@ -897,41 +1096,134 @@ interface JTTimelineDataCard {
   timeline: JTTimelinePointCard[];
 }
 
+// Treasury Interfaces
+interface TreasuryAuctionItem {
+  auction_id: number;
+  cusip: string;
+  auction_date: string;
+  security_type: string;
+  security_term: string;
+  offering_amount: number | null;
+  bid_to_cover_ratio: number | null;
+  high_yield: number | null;
+  coupon_rate: number | null;
+  tail_bps: number | null;
+  auction_result: string | null;
+}
+
+// FRED Yield Curve Interfaces
+interface FredYieldCurvePoint {
+  tenor: string;
+  series_id: string;
+  yield: number | null;
+  date: string | null;
+  source: string | null;
+  daily_change_bps: number | null;
+  weekly_change_bps: number | null;
+  monthly_change_bps: number | null;
+}
+
+interface FredYieldCurveData {
+  as_of_date: string;
+  curve: FredYieldCurvePoint[];
+  spreads: {
+    '2s10s'?: number;
+    '2s30s'?: number;
+    '5s30s'?: number;
+    '3m10y'?: number;
+  };
+  tips_real_yields: Array<{ tenor: string; real_yield: number }>;
+  breakeven_inflation: Array<{ tenor: string; breakeven: number }>;
+}
+
+// Market Indices types
+interface MarketIndex {
+  symbol: string;
+  name: string;
+  price: number | null;
+  change: number | null;
+  change_pct: number | null;
+  date: string | null;
+  sparkline: number[];
+  source: string | null;
+  is_realtime: boolean;
+}
+
+interface MarketIndicesData {
+  as_of: string;
+  market_status: string;
+  indices: MarketIndex[];
+}
+
+// Economic Calendar types
+interface EconomicCalendarEvent {
+  date: string;
+  time: string;
+  datetime: string;
+  name: string;
+  country: string;
+  source: string;
+  impact: string | null;
+  importance: number;
+  previous: number | null;
+  estimate: number | null;
+  actual: number | null;
+}
+
+interface EconomicCalendarData {
+  as_of: string;
+  count: number;
+  data_source?: string;  // "upcoming" or "recent"
+  events: EconomicCalendarEvent[];
+}
+
 type EmploymentTabType = 'sectors' | 'earnings' | 'jolts';
 
 function EmploymentTabbedCard() {
   const [activeTab, setActiveTab] = useState<EmploymentTabType>('sectors');
-  const [supersectors, setSupersectors] = useState<CESupersectorsData | null>(null);
-  const [ceTimeline, setCeTimeline] = useState<CESupersectorTimelineData | null>(null);
-  const [earnings, setEarnings] = useState<CEEarningsData | null>(null);
-  const [jtTimeline, setJtTimeline] = useState<JTTimelineDataCard | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const [ssRes, ceTlRes, earningsRes, jtTlRes] = await Promise.all([
-          ceResearchAPI.getSupersectors<CESupersectorsData>(),
-          ceResearchAPI.getSupersectorsTimeline<CESupersectorTimelineData>({
-            supersector_codes: '05,06,07,08,10,20,30,40,41,42,43,50,55,60,65,70,80,90',
-            months_back: 60
-          }),
-          ceResearchAPI.getEarnings<CEEarningsData>({ limit: 10 }),
-          jtResearchAPI.getOverviewTimeline<JTTimelineDataCard>('000000', '00', 60),
-        ]);
-        setSupersectors(ssRes.data);
-        setCeTimeline(ceTlRes.data);
-        setEarnings(earningsRes.data);
-        setJtTimeline(jtTlRes.data);
-      } catch (error) {
-        console.error('Failed to load employment data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, []);
+  // Use React Query for supersectors - shared cache
+  const { data: supersectors } = useQuery({
+    queryKey: ['ce-supersectors'],
+    queryFn: async () => {
+      const res = await ceResearchAPI.getSupersectors<CESupersectorsData>();
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // CE Timeline
+  const { data: ceTimeline } = useQuery({
+    queryKey: ['ce-supersectors-timeline'],
+    queryFn: async () => {
+      const res = await ceResearchAPI.getSupersectorsTimeline<CESupersectorTimelineData>({
+        supersector_codes: '05,06,07,08,10,20,30,40,41,42,43,50,55,60,65,70,80,90',
+        months_back: 60
+      });
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Earnings
+  const { data: earnings } = useQuery({
+    queryKey: ['ce-earnings'],
+    queryFn: async () => {
+      const res = await ceResearchAPI.getEarnings<CEEarningsData>({ limit: 15 });
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // JOLTS Timeline
+  const { data: jtTimeline, isLoading: loading } = useQuery({
+    queryKey: ['jt-timeline-overview'],
+    queryFn: async () => {
+      const res = await jtResearchAPI.getOverviewTimeline<JTTimelineDataCard>('000000', '00', 60);
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Get same-month data for YoY comparison (5 years of same month)
   const getSameMonthData = <T extends { year: number; period: string }>(timeline: T[] | undefined): T[] => {
@@ -948,10 +1240,10 @@ function EmploymentTabbedCard() {
   const topSupersectors = supersectors?.supersectors
     ?.filter(ss => ss.latest_value && ss.latest_value > 0)
     .sort((a, b) => (b.latest_value || 0) - (a.latest_value || 0))
-    .slice(0, 8) || [];
+    .slice(0, 12) || [];
 
   // Top earnings industries
-  const topEarnings = earnings?.earnings?.slice(0, 8) || [];
+  const topEarnings = earnings?.earnings?.slice(0, 12) || [];
 
   const tabs: { id: EmploymentTabType; label: string }[] = [
     { id: 'sectors', label: 'Sectors' },
@@ -960,7 +1252,7 @@ function EmploymentTabbedCard() {
   ];
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[400px]">
       {/* Header with tabs */}
       <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2 bg-gray-50">
         <div className="flex items-center gap-2">
@@ -987,11 +1279,11 @@ function EmploymentTabbedCard() {
       {/* Content */}
       <div className="p-2">
         {loading ? (
-          <div className="flex items-center justify-center h-[220px]">
+          <div className="flex items-center justify-center h-[340px]">
             <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : activeTab === 'sectors' ? (
-          <div className="overflow-x-auto max-h-[220px]">
+          <div className="overflow-x-auto max-h-[340px]">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-gray-50 z-10">
                 <tr className="border-b border-gray-200">
@@ -1037,7 +1329,7 @@ function EmploymentTabbedCard() {
             </table>
           </div>
         ) : activeTab === 'earnings' ? (
-          <div className="overflow-x-auto max-h-[220px]">
+          <div className="overflow-x-auto max-h-[340px]">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-gray-50 z-10">
                 <tr className="border-b border-gray-200">
@@ -1064,7 +1356,7 @@ function EmploymentTabbedCard() {
             </table>
           </div>
         ) : (
-          <div className="overflow-x-auto max-h-[220px]">
+          <div className="overflow-x-auto max-h-[340px]">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-gray-50 z-10">
                 <tr className="border-b border-gray-200">
@@ -1120,7 +1412,79 @@ function EmploymentTabbedCard() {
   );
 }
 
+interface GDPHeadlineData {
+  current: {
+    value: number | null;
+    prior: number | null;
+    period: string | null;
+    unit: string;
+  };
+  components: Array<{
+    name: string;
+    contribution: number;
+    pct: number;
+  }>;
+  trend: Array<{
+    q: string;
+    period: string;
+    value: number | null;
+  }>;
+}
+
 function GDPCard() {
+  // Use React Query for GDP headline data
+  const { data: gdpData, isLoading: loading, error } = useQuery({
+    queryKey: ['nipa-headline'],
+    queryFn: async () => {
+      const response = await beaResearchAPI.getNIPAHeadline<GDPHeadlineData>();
+      return response.data;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes - GDP data updates infrequently
+    gcTime: 60 * 60 * 1000, // Keep in cache for 1 hour
+  });
+
+  // Format period like "2024Q3" to "Q3 2024"
+  const formatPeriod = (period: string | null) => {
+    if (!period) return '';
+    if (period.includes('Q')) {
+      const year = period.substring(0, 4);
+      const quarter = period.substring(4);
+      return `${quarter} ${year}`;
+    }
+    return period;
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Globe className="w-4 h-4 text-emerald-600" />
+          <h3 className="font-semibold text-gray-900 text-sm">GDP Growth</h3>
+        </div>
+        <div className="flex justify-center items-center h-32">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !gdpData) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Globe className="w-4 h-4 text-emerald-600" />
+          <h3 className="font-semibold text-gray-900 text-sm">GDP Growth</h3>
+        </div>
+        <div className="text-center text-gray-500 text-sm py-4">
+          {error ? 'Failed to load GDP data' : 'No data available'}
+        </div>
+        <Link to="/research/bea" className="flex items-center justify-center gap-1 mt-3 pt-3 border-t border-gray-100 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+          GDP & BEA Data <ChevronRight className="w-3 h-3" />
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <div className="flex items-center justify-between mb-3">
@@ -1128,13 +1492,17 @@ function GDPCard() {
           <Globe className="w-4 h-4 text-emerald-600" />
           <h3 className="font-semibold text-gray-900 text-sm">GDP Growth</h3>
         </div>
-        <span className="text-xs text-gray-500">Q3 2024</span>
+        <span className="text-xs text-gray-500">{formatPeriod(gdpData.current.period)}</span>
       </div>
 
       <div className="flex gap-4 mb-4">
         <div>
-          <div className="text-3xl font-bold text-gray-900">{gdpData.current.value}%</div>
-          <div className="text-xs text-gray-500">SAAR • Prior {gdpData.current.prior}%</div>
+          <div className="text-3xl font-bold text-gray-900">
+            {gdpData.current.value != null ? `${gdpData.current.value.toFixed(1)}%` : 'N/A'}
+          </div>
+          <div className="text-xs text-gray-500">
+            SAAR • Prior {gdpData.current.prior != null ? `${gdpData.current.prior.toFixed(1)}%` : 'N/A'}
+          </div>
         </div>
         <div className="flex-1 h-20">
           <ResponsiveContainer width="100%" height="100%">
@@ -1151,23 +1519,27 @@ function GDPCard() {
       </div>
 
       {/* Contributions */}
-      <div className="text-xs text-gray-500 mb-2">Contribution to Growth</div>
-      <div className="space-y-1.5">
-        {gdpData.components.map((c, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <div className="w-20 text-xs text-gray-600">{c.name}</div>
-            <div className="flex-1 h-2 bg-gray-100 rounded overflow-hidden">
-              <div
-                className={`h-full ${c.contribution >= 0 ? 'bg-emerald-500' : 'bg-red-400'}`}
-                style={{ width: `${Math.abs(c.pct)}%`, marginLeft: c.contribution < 0 ? 'auto' : 0 }}
-              />
-            </div>
-            <div className={`w-12 text-xs font-medium text-right ${c.contribution >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-              {c.contribution >= 0 ? '+' : ''}{c.contribution.toFixed(2)}
-            </div>
+      {gdpData.components.length > 0 && (
+        <>
+          <div className="text-xs text-gray-500 mb-2">Contribution to Growth</div>
+          <div className="space-y-1.5">
+            {gdpData.components.map((c, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <div className="w-20 text-xs text-gray-600">{c.name}</div>
+                <div className="flex-1 h-2 bg-gray-100 rounded overflow-hidden">
+                  <div
+                    className={`h-full ${c.contribution >= 0 ? 'bg-emerald-500' : 'bg-red-400'}`}
+                    style={{ width: `${Math.abs(c.pct)}%`, marginLeft: c.contribution < 0 ? 'auto' : 0 }}
+                  />
+                </div>
+                <div className={`w-12 text-xs font-medium text-right ${c.contribution >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {c.contribution >= 0 ? '+' : ''}{c.contribution.toFixed(2)}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       <Link to="/research/bea" className="flex items-center justify-center gap-1 mt-3 pt-3 border-t border-gray-100 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
         GDP & BEA Data <ChevronRight className="w-3 h-3" />
@@ -1177,6 +1549,54 @@ function GDPCard() {
 }
 
 function CalendarCard() {
+  const [activeTab, setActiveTab] = useState<'today' | 'upcoming'>('today');
+
+  // Use React Query for calendar events
+  const { data: allEvents = [], isLoading: loading } = useQuery({
+    queryKey: ['economic-calendar-upcoming'],
+    queryFn: async () => {
+      const res = await economicCalendarAPI.getUpcoming<EconomicCalendarData>({
+        days: 14,
+        country: 'US',
+        limit: 20
+      });
+      return res.data.events || [];
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 15 * 60 * 1000,
+  });
+
+  // Split events into today and upcoming
+  const today = new Date().toDateString();
+  const todayEvents = allEvents.filter(e => {
+    if (!e.datetime) return false;
+    return new Date(e.datetime).toDateString() === today;
+  });
+  const upcomingEvents = allEvents.filter(e => {
+    if (!e.datetime) return false;
+    return new Date(e.datetime).toDateString() !== today;
+  });
+
+  const displayEvents = activeTab === 'today' ? todayEvents : upcomingEvents;
+
+  // Impact color mapping
+  const getImpactColor = (impact: string | null) => {
+    switch (impact) {
+      case 'High': return 'bg-red-500';
+      case 'Medium': return 'bg-amber-500';
+      case 'Low': return 'bg-gray-400';
+      default: return 'bg-gray-300';
+    }
+  };
+
+  // Format value with unit
+  const formatValue = (val: number | null) => {
+    if (val === null) return '--';
+    if (Math.abs(val) >= 1000) return `${(val / 1000).toFixed(1)}K`;
+    if (Math.abs(val) >= 1) return val.toFixed(1);
+    return val.toFixed(2);
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -1184,25 +1604,73 @@ function CalendarCard() {
           <Calendar className="w-4 h-4 text-gray-400" />
           <h3 className="font-semibold text-gray-900 text-sm">Economic Calendar</h3>
         </div>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setActiveTab('today')}
+            className={`px-2 py-0.5 text-xs rounded ${
+              activeTab === 'today'
+                ? 'bg-indigo-100 text-indigo-700 font-medium'
+                : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            Today ({todayEvents.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('upcoming')}
+            className={`px-2 py-0.5 text-xs rounded ${
+              activeTab === 'upcoming'
+                ? 'bg-indigo-100 text-indigo-700 font-medium'
+                : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            Upcoming ({upcomingEvents.length})
+          </button>
+        </div>
       </div>
-      <div className="divide-y divide-gray-100">
-        {calendarEvents.map((e, i) => (
-          <div key={i} className="px-4 py-2 flex items-center gap-3 hover:bg-gray-50">
-            <div className="w-12 text-center">
-              <div className="text-xs font-medium text-gray-900">{e.date}</div>
-              <div className="text-[10px] text-gray-400">{e.time}</div>
-            </div>
-            <div className="flex-1">
-              <div className="text-sm text-gray-900">{e.name}</div>
-              <div className="text-[10px] text-gray-500">{e.source}</div>
-            </div>
-            <div className="flex gap-0.5">
-              {[...Array(3)].map((_, j) => (
-                <div key={j} className={`w-1.5 h-1.5 rounded-full ${j < e.importance ? 'bg-red-400' : 'bg-gray-200'}`} />
-              ))}
-            </div>
+      <div className="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
+        {loading ? (
+          <div className="px-4 py-6 text-center text-sm text-gray-400">Loading...</div>
+        ) : displayEvents.length === 0 ? (
+          <div className="px-4 py-6 text-center text-sm text-gray-400">
+            {activeTab === 'today' ? 'No events today' : 'No upcoming events'}
           </div>
-        ))}
+        ) : (
+          displayEvents.map((e, i) => (
+            <div key={i} className="px-3 py-2 hover:bg-gray-50">
+              <div className="flex items-start gap-2">
+                {/* Impact indicator */}
+                <div className={`w-1 h-full min-h-[36px] rounded-full ${getImpactColor(e.impact)}`} />
+
+                {/* Time and Date */}
+                <div className="w-14 flex-shrink-0">
+                  <div className="text-xs font-medium text-gray-900">{e.time}</div>
+                  {activeTab === 'upcoming' && (
+                    <div className="text-[10px] text-gray-400">{e.date}</div>
+                  )}
+                </div>
+
+                {/* Event info */}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-gray-900 truncate">{e.name}</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {e.actual !== null ? (
+                      <>
+                        <span className="text-[10px] text-gray-500">Act: <span className="font-medium text-gray-700">{formatValue(e.actual)}</span></span>
+                        <span className="text-[10px] text-gray-400">Est: {formatValue(e.estimate)}</span>
+                        <span className="text-[10px] text-gray-400">Prev: {formatValue(e.previous)}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[10px] text-gray-500">Est: <span className="font-medium text-gray-700">{formatValue(e.estimate)}</span></span>
+                        <span className="text-[10px] text-gray-400">Prev: {formatValue(e.previous)}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
       <Link to="/research/calendar" className="block px-4 py-2 text-center text-xs text-indigo-600 hover:text-indigo-700 font-medium border-t border-gray-100">
         View Full Calendar →
@@ -1252,12 +1720,37 @@ function DataExplorerGrid() {
 }
 
 function AuctionResultsCard() {
-  const auctions = [
-    { term: '10Y', date: 'Dec 4', yield: 4.235, btc: 2.58, tail: -0.3, result: 'strong' },
-    { term: '30Y', date: 'Nov 27', yield: 4.535, btc: 2.39, tail: 0.8, result: 'weak' },
-    { term: '5Y', date: 'Nov 26', yield: 4.197, btc: 2.42, tail: 0.2, result: 'neutral' },
-    { term: '2Y', date: 'Nov 25', yield: 4.274, btc: 2.68, tail: -0.5, result: 'strong' },
-  ];
+  const [auctions, setAuctions] = useState<TreasuryAuctionItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadAuctions = async () => {
+      try {
+        setLoading(true);
+        const res = await treasuryResearchAPI.getAuctions<TreasuryAuctionItem[]>({ limit: 6 });
+        setAuctions(res.data || []);
+      } catch (error) {
+        console.error('Failed to load recent auctions:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadAuctions();
+  }, []);
+
+  // Format date for display
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Determine auction result based on bid-to-cover and tail
+  const getAuctionResult = (btc: number | null, tail: number | null): string => {
+    if (btc == null) return 'pending';
+    if (btc >= 2.5 && (tail == null || tail <= 0)) return 'strong';
+    if (btc < 2.0 || (tail != null && tail > 1)) return 'weak';
+    return 'neutral';
+  };
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -1267,42 +1760,58 @@ function AuctionResultsCard() {
           <h3 className="font-semibold text-gray-900 text-sm">Recent Auctions</h3>
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-gray-500 border-b border-gray-100">
-              <th className="pb-2 text-left font-medium">Term</th>
-              <th className="pb-2 text-left font-medium">Date</th>
-              <th className="pb-2 text-right font-medium">Yield</th>
-              <th className="pb-2 text-right font-medium">BTC</th>
-              <th className="pb-2 text-right font-medium">Tail</th>
-              <th className="pb-2 text-center font-medium">Result</th>
-            </tr>
-          </thead>
-          <tbody>
-            {auctions.map((a, i) => (
-              <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                <td className="py-2 font-medium text-gray-900">{a.term}</td>
-                <td className="py-2 text-gray-600">{a.date}</td>
-                <td className="py-2 text-right text-gray-900">{a.yield}%</td>
-                <td className="py-2 text-right text-gray-600">{a.btc}x</td>
-                <td className={`py-2 text-right font-medium ${a.tail <= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {a.tail > 0 ? '+' : ''}{a.tail}
-                </td>
-                <td className="py-2 text-center">
-                  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                    a.result === 'strong' ? 'bg-emerald-100 text-emerald-700' :
-                    a.result === 'weak' ? 'bg-red-100 text-red-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {a.result}
-                  </span>
-                </td>
+      {loading ? (
+        <div className="flex items-center justify-center h-32">
+          <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-gray-500 border-b border-gray-100">
+                <th className="pb-2 text-left font-medium">Term</th>
+                <th className="pb-2 text-left font-medium">Date</th>
+                <th className="pb-2 text-right font-medium">Yield</th>
+                <th className="pb-2 text-right font-medium">BTC</th>
+                <th className="pb-2 text-right font-medium">Tail</th>
+                <th className="pb-2 text-center font-medium">Result</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {auctions.map((a) => {
+                const result = a.auction_result || getAuctionResult(a.bid_to_cover_ratio, a.tail_bps);
+                return (
+                  <tr key={a.auction_id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="py-2 font-medium text-gray-900">
+                      {a.security_term.replace('-Year', 'Y').replace(' Month', 'M')}
+                    </td>
+                    <td className="py-2 text-gray-600">{formatDate(a.auction_date)}</td>
+                    <td className="py-2 text-right text-gray-900">
+                      {a.high_yield != null ? `${a.high_yield.toFixed(3)}%` : '--'}
+                    </td>
+                    <td className="py-2 text-right text-gray-600">
+                      {a.bid_to_cover_ratio != null ? `${a.bid_to_cover_ratio.toFixed(2)}x` : '--'}
+                    </td>
+                    <td className={`py-2 text-right font-medium ${a.tail_bps != null ? (a.tail_bps <= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-gray-400'}`}>
+                      {a.tail_bps != null ? `${a.tail_bps > 0 ? '+' : ''}${a.tail_bps.toFixed(1)}` : '--'}
+                    </td>
+                    <td className="py-2 text-center">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        result === 'strong' ? 'bg-emerald-100 text-emerald-700' :
+                        result === 'weak' ? 'bg-red-100 text-red-700' :
+                        result === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {result}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
       <Link to="/research/treasury/auctions" className="flex items-center justify-center gap-1 mt-3 pt-3 border-t border-gray-100 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
         All Auctions <ChevronRight className="w-3 h-3" />
       </Link>
@@ -2028,7 +2537,7 @@ function SurveyCarousel({ data }: { data: CarouselData }) {
       </div>
 
       {/* Content */}
-      <div className="p-4 min-h-[220px]">
+      <div className="p-4 min-h-[280px]">
         {renderSlide()}
       </div>
 
@@ -2092,91 +2601,71 @@ function MarketImpactStrip() {
 // ============================================================================
 
 export default function Research(): React.ReactElement {
-  // Carousel data state for all 7 BLS surveys
-  const [carouselData, setCarouselData] = useState<CarouselData>({
-    ln: { overview: null, timeline: [] },
-    ce: { overview: null, timeline: [], supersectors: [] },
-    cu: { overview: null, timeline: [] },
-    la: { states: null },
-    wp: { overview: null, timeline: [] },
-    pc: { overview: null },
-    jt: { overview: null, timeline: [] },
-    loading: true,
+  // Use React Query's useQueries for parallel fetching with caching
+  const queryConfigs = [
+    { key: 'ln-overview', fn: () => lnResearchAPI.getOverview<LNOverviewData>() },
+    { key: 'ln-timeline', fn: () => lnResearchAPI.getOverviewTimeline<{ timeline: LNTimelinePoint[] }>(24) },
+    { key: 'ce-overview', fn: () => ceResearchAPI.getOverview<CEOverviewData>() },
+    { key: 'ce-supersectors', fn: () => ceResearchAPI.getSupersectors<{ supersectors: SupersectorItem[] }>() },
+    { key: 'cu-overview', fn: () => cuResearchAPI.getOverview<CUOverviewData>() },
+    { key: 'cu-timeline', fn: () => cuResearchAPI.getOverviewTimeline<{ timeline: CUTimelinePoint[] }>('0000', 24) },
+    { key: 'la-states', fn: () => laResearchAPI.getStates<LAStatesData>() },
+    { key: 'wp-overview', fn: () => wpResearchAPI.getOverview<WPOverviewData>() },
+    { key: 'wp-timeline', fn: () => wpResearchAPI.getOverviewTimeline<{ timeline: WPTimelinePoint[] }>(24) },
+    { key: 'pc-overview', fn: () => pcResearchAPI.getOverview<PCOverviewData>() },
+    { key: 'jt-overview', fn: () => jtResearchAPI.getOverview<JTOverviewData>() },
+    { key: 'jt-timeline', fn: () => jtResearchAPI.getOverviewTimeline<{ timeline: JTTimelinePoint[] }>('000000', '00', 24) },
+  ];
+
+  const queryResults = useQueries({
+    queries: queryConfigs.map(config => ({
+      queryKey: [config.key],
+      queryFn: async () => {
+        const res = await config.fn();
+        return res.data;
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 30 * 60 * 1000, // 30 minutes
+    })),
   });
 
-  // Fetch all survey data for carousel on mount
-  useEffect(() => {
-    const fetchCarouselData = async () => {
-      try {
-        // Fetch all surveys in parallel
-        const [
-          lnOverviewRes, lnTimelineRes,
-          ceOverviewRes, ceSupersectorsRes,
-          cuOverviewRes, cuTimelineRes,
-          laStatesRes,
-          wpOverviewRes, wpTimelineRes,
-          pcOverviewRes,
-          jtOverviewRes, jtTimelineRes,
-        ] = await Promise.all([
-          // LN - Labor Force Statistics
-          lnResearchAPI.getOverview<LNOverviewData>(),
-          lnResearchAPI.getOverviewTimeline<{ timeline: LNTimelinePoint[] }>(24),
-          // CE - Employment Situation
-          ceResearchAPI.getOverview<CEOverviewData>(),
-          ceResearchAPI.getSupersectors<{ supersectors: SupersectorItem[] }>(),
-          // CU - Consumer Prices (CPI)
-          cuResearchAPI.getOverview<CUOverviewData>(),
-          cuResearchAPI.getOverviewTimeline<{ timeline: CUTimelinePoint[] }>('0000', 24),
-          // LA - Local Area Unemployment (states for map view)
-          laResearchAPI.getStates<LAStatesData>(),
-          // WP - Producer Prices (PPI)
-          wpResearchAPI.getOverview<WPOverviewData>(),
-          wpResearchAPI.getOverviewTimeline<{ timeline: WPTimelinePoint[] }>(24),
-          // PC - PPI by Industry
-          pcResearchAPI.getOverview<PCOverviewData>(),
-          // JT - JOLTS
-          jtResearchAPI.getOverview<JTOverviewData>(),
-          jtResearchAPI.getOverviewTimeline<{ timeline: JTTimelinePoint[] }>('000000', '00', 24),
-        ]);
+  // Derive carousel data from query results
+  const carouselData = useMemo<CarouselData>(() => {
+    const isLoading = queryResults.some(q => q.isLoading);
+    const [lnOverview, lnTimeline, ceOverview, ceSupersectors, cuOverview, cuTimeline,
+           laStates, wpOverview, wpTimeline, pcOverview, jtOverview, jtTimeline] = queryResults;
 
-        setCarouselData({
-          ln: {
-            overview: lnOverviewRes.data,
-            timeline: lnTimelineRes.data?.timeline || [],
-          },
-          ce: {
-            overview: ceOverviewRes.data,
-            timeline: [],
-            supersectors: ceSupersectorsRes.data?.supersectors || [],
-          },
-          cu: {
-            overview: cuOverviewRes.data,
-            timeline: cuTimelineRes.data?.timeline || [],
-          },
-          la: {
-            states: laStatesRes.data,
-          },
-          wp: {
-            overview: wpOverviewRes.data,
-            timeline: wpTimelineRes.data?.timeline || [],
-          },
-          pc: {
-            overview: pcOverviewRes.data,
-          },
-          jt: {
-            overview: jtOverviewRes.data,
-            timeline: jtTimelineRes.data?.timeline || [],
-          },
-          loading: false,
-        });
-      } catch (error) {
-        console.error('Failed to fetch carousel data:', error);
-        setCarouselData(prev => ({ ...prev, loading: false }));
-      }
+    return {
+      ln: {
+        overview: lnOverview.data as LNOverviewData | null,
+        timeline: (lnTimeline.data as { timeline: LNTimelinePoint[] } | undefined)?.timeline || [],
+      },
+      ce: {
+        overview: ceOverview.data as CEOverviewData | null,
+        timeline: [],
+        supersectors: (ceSupersectors.data as { supersectors: SupersectorItem[] } | undefined)?.supersectors || [],
+      },
+      cu: {
+        overview: cuOverview.data as CUOverviewData | null,
+        timeline: (cuTimeline.data as { timeline: CUTimelinePoint[] } | undefined)?.timeline || [],
+      },
+      la: {
+        states: laStates.data as LAStatesData | null,
+      },
+      wp: {
+        overview: wpOverview.data as WPOverviewData | null,
+        timeline: (wpTimeline.data as { timeline: WPTimelinePoint[] } | undefined)?.timeline || [],
+      },
+      pc: {
+        overview: pcOverview.data as PCOverviewData | null,
+      },
+      jt: {
+        overview: jtOverview.data as JTOverviewData | null,
+        timeline: (jtTimeline.data as { timeline: JTTimelinePoint[] } | undefined)?.timeline || [],
+      },
+      loading: isLoading,
     };
-
-    fetchCarouselData();
-  }, []);
+  }, [queryResults]);
 
   return (
     <div className="min-h-screen bg-gray-100">

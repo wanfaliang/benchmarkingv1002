@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 import secrets
 from .api import auth, tickers, analyses, websocket, datasets
 from .api.research import treasury as treasury_research
+from .api.research import fred_explorer as fred_research
 from .api.research.bls import cu_explorer as cu_research
 from .api.research.bls import ln_explorer as ln_research
 from .api.research.bls import la_explorer as la_research
@@ -28,6 +29,10 @@ from .api.research.bls import su_explorer as su_research
 from .api.research.bls import bd_explorer as bd_research
 from .api.research.bls import ei_explorer as ei_research
 from .api.research import portal_api as portal_research
+from .api.research import market_indices as market_research
+from .api.research import economic_calendar as calendar_research
+from .api.research import bea_explorer as bea_research
+from .api.research.market_indices import start_polling, get_market_status
 from .config import settings
 
 import logging
@@ -81,6 +86,7 @@ app.include_router(datasets.router)
 
 # Research module routers (DATA database)
 app.include_router(treasury_research.router)
+app.include_router(fred_research.router)
 app.include_router(cu_research.router)
 app.include_router(ln_research.router)
 app.include_router(la_research.router)
@@ -102,6 +108,15 @@ app.include_router(ei_research.router)
 
 # Research Portal API
 app.include_router(portal_research.router)
+
+# Market Indices API
+app.include_router(market_research.router)
+
+# Economic Calendar API
+app.include_router(calendar_research.router)
+
+# BEA (Bureau of Economic Analysis) API
+app.include_router(bea_research.router)
 
 def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
     """
@@ -175,3 +190,18 @@ def favicon():
 @app.exception_handler(Exception)
 async def generic_handler(request: Request, exc: Exception):
   return JSONResponse(status_code=500, content={"detail":"Internal Server Error"})
+
+
+# Startup event to initialize yfinance polling for real-time market data
+@app.on_event("startup")
+async def startup_event():
+    """Start yfinance polling for real-time index prices."""
+    try:
+        market_status = get_market_status()
+        logger.info(f"Market status: {market_status}")
+
+        # Start yfinance polling background task
+        await start_polling()
+        logger.info("yfinance polling started for real-time index prices")
+    except Exception as e:
+        logger.error(f"Failed to start yfinance polling: {e}")

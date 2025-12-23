@@ -30,3 +30,4 @@ tomli==2.0.1
 uvicorn==0.24.0
 watchfiles==1.1.0
 websockets==15.0.1
+yfinance==0.2.51
