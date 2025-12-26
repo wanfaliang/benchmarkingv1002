@@ -48,6 +48,17 @@ import SUExplorer from './pages/bls/SUExplorer';
 import BDExplorer from './pages/bls/BDExplorer';
 import EIExplorer from './pages/bls/EIExplorer';
 
+// FRED Explorer Pages
+import ClaimsExplorer from './pages/ClaimsExplorer';
+import YieldCurveExplorer from './pages/YieldCurveExplorer';
+import FedFundsExplorer from './pages/FedFundsExplorer';
+import SentimentExplorer from './pages/SentimentExplorer';
+import LeadingIndexExplorer from './pages/LeadingIndexExplorer';
+import HousingExplorer from './pages/HousingExplorer';
+import FREDCalendarExplorer from './pages/FREDCalendarExplorer';
+import FREDReleasePage from './pages/FREDReleasePage';
+import FREDSeriesPage from './pages/FREDSeriesPage';
+
 // BEA Explorer Pages
 import NIPAExplorer from './pages/NIPAExplorer';
 import RegionalExplorer from './pages/RegionalExplorer';
@@ -155,7 +166,16 @@ function App(): React.ReactElement {
             {/* Research Module */}
             <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
             <Route path="/research/treasury" element={<ProtectedRoute><TreasuryExplorer /></ProtectedRoute>} />
+            <Route path="/research/claims" element={<ProtectedRoute><ClaimsExplorer /></ProtectedRoute>} />
+            <Route path="/research/fed-funds" element={<ProtectedRoute><FedFundsExplorer /></ProtectedRoute>} />
+            <Route path="/research/sentiment" element={<ProtectedRoute><SentimentExplorer /></ProtectedRoute>} />
+            <Route path="/research/leading" element={<ProtectedRoute><LeadingIndexExplorer /></ProtectedRoute>} />
+            <Route path="/research/housing" element={<ProtectedRoute><HousingExplorer /></ProtectedRoute>} />
+            <Route path="/research/yield-curve" element={<ProtectedRoute><YieldCurveExplorer /></ProtectedRoute>} />
             <Route path="/research/calendar" element={<ProtectedRoute><EconomicCalendar /></ProtectedRoute>} />
+            <Route path="/research/fred-calendar" element={<ProtectedRoute><FREDCalendarExplorer /></ProtectedRoute>} />
+            <Route path="/research/fred-calendar/release/:releaseId" element={<ProtectedRoute><FREDReleasePage /></ProtectedRoute>} />
+            <Route path="/research/fred-calendar/series/:seriesId" element={<ProtectedRoute><FREDSeriesPage /></ProtectedRoute>} />
 
             {/* BEA Research Module - with layout */}
             <Route path="/research/bea" element={<ProtectedRoute><BEALayout /></ProtectedRoute>}>

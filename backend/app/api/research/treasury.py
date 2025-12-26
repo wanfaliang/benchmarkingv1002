@@ -276,7 +276,7 @@ async def get_auction_detail(
 @router.get("/history/{security_term}", response_model=YieldHistoryResponse)
 async def get_yield_history(
     security_term: str,
-    years: int = Query(5, ge=1, le=20),
+    years: int = Query(5, ge=1, le=50),
     include_reopenings: bool = Query(True, description="Include reopenings for benchmark terms"),
     db: Session = Depends(get_data_db),
     current_user: User = Depends(get_current_user)
@@ -344,7 +344,7 @@ async def get_upcoming_auctions(
 @router.get("/compare")
 async def compare_terms(
     terms: str = Query("10-Year,30-Year", description="Comma-separated list of terms"),
-    years: int = Query(5, ge=1, le=20),
+    years: int = Query(5, ge=1, le=50),
     db: Session = Depends(get_data_db),
     current_user: User = Depends(get_current_user)
 ):

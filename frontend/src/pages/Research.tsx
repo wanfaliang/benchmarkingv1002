@@ -44,9 +44,11 @@ import {
   jtResearchAPI,
   treasuryResearchAPI,
   fredResearchAPI,
+  claimsResearchAPI,
   marketResearchAPI,
   economicCalendarAPI,
   beaResearchAPI,
+  fredCalendarAPI,
 } from '../services/api';
 import { ChevronLeft } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
@@ -328,23 +330,7 @@ const laborData = {
   },
 };
 
-const inflationData = {
-  cpi: {
-    headline: { value: 2.6, prior: 2.4, trend: [3.0, 2.9, 2.5, 2.4, 2.6, 2.6] },
-    core: { value: 3.3, prior: 3.3, trend: [3.4, 3.3, 3.2, 3.3, 3.3, 3.3] },
-    shelter: { value: 4.9, prior: 5.0 },
-    energy: { value: -4.9, prior: -6.8 },
-    food: { value: 2.3, prior: 2.3 },
-  },
-  components: [
-    { name: 'Shelter', weight: 36.2, yoy: 4.9, mom: 0.4, trend: 'down' },
-    { name: 'Transportation', weight: 14.8, yoy: 8.2, mom: 0.1, trend: 'down' },
-    { name: 'Food', weight: 13.5, yoy: 2.3, mom: 0.2, trend: 'flat' },
-    { name: 'Medical', weight: 8.4, yoy: 3.0, mom: 0.3, trend: 'up' },
-    { name: 'Apparel', weight: 2.5, yoy: -1.2, mom: -0.2, trend: 'down' },
-    { name: 'Energy', weight: 6.8, yoy: -4.9, mom: -0.4, trend: 'up' },
-  ],
-};
+// inflationData removed - replaced with ClaimsCard using real FRED data
 
 // GDP data is now fetched from real NIPA API in GDPCard component
 
@@ -616,6 +602,120 @@ function MarketTickerBar() {
   );
 }
 
+// FRED Release Calendar Card for Research Portal
+interface FredCalendarRelease {
+  release_id: number;
+  release_name: string;
+  release_date: string;
+  series_count: number;
+}
+
+interface FredCalendarWeekData {
+  week_start: string;
+  week_end: string;
+  total_releases: number;
+  releases_by_date: Record<string, FredCalendarRelease[]>;
+  releases: FredCalendarRelease[];
+}
+
+function FREDCalendarCard() {
+  // Fetch this week's releases
+  const { data: weekData, isLoading: loading } = useQuery({
+    queryKey: ['fred-calendar-week'],
+    queryFn: async () => {
+      const res = await fredCalendarAPI.getWeek<FredCalendarWeekData>();
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+  });
+
+  const releases: FredCalendarRelease[] = weekData?.releases || [];
+
+  // Group by date
+  const byDate: Record<string, FredCalendarRelease[]> = {};
+  releases.forEach((r: FredCalendarRelease) => {
+    if (!byDate[r.release_date]) byDate[r.release_date] = [];
+    byDate[r.release_date].push(r);
+  });
+
+  // Format date for display
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr + 'T12:00:00');
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  // Check if date is today
+  const isToday = (dateStr: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    return dateStr === today;
+  };
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-indigo-500" />
+          <h3 className="font-semibold text-gray-900 text-sm">FRED Release Calendar</h3>
+        </div>
+        <Link
+          to="/research/fred-calendar"
+          className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+        >
+          View All →
+        </Link>
+      </div>
+      <div className="p-4 min-h-[320px]">
+        {loading ? (
+          <div className="animate-pulse space-y-4">
+            <div className="h-16 bg-gray-100 rounded-lg"></div>
+            <div className="h-16 bg-gray-100 rounded-lg"></div>
+            <div className="h-16 bg-gray-100 rounded-lg"></div>
+          </div>
+        ) : releases.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-12">No releases this week</p>
+        ) : (
+          <div className="space-y-3">
+            {Object.entries(byDate).slice(0, 6).map(([date, items]) => (
+              <div
+                key={date}
+                className={`p-3 rounded-lg border ${
+                  isToday(date)
+                    ? 'bg-indigo-50 border-indigo-300 shadow-sm'
+                    : 'bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className={`text-xs font-bold mb-2 flex items-center gap-2 ${isToday(date) ? 'text-indigo-700' : 'text-gray-600'}`}>
+                  {formatDate(date)}
+                  {isToday(date) && (
+                    <span className="px-2 py-0.5 bg-indigo-500 text-white rounded text-[10px] font-semibold">TODAY</span>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  {items.slice(0, 4).map((r, i) => (
+                    <div key={i} className="flex justify-between items-center py-0.5">
+                      <span className="text-sm text-gray-800 truncate mr-3">{r.release_name}</span>
+                      <span className="text-xs text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">{r.series_count}</span>
+                    </div>
+                  ))}
+                  {items.length > 4 && (
+                    <div className="text-xs text-gray-500 pt-1">+{items.length - 4} more releases</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-4 pt-3 border-t border-gray-100 text-center">
+          <span className="text-sm font-medium text-gray-600">
+            {weekData?.total_releases || 0} releases scheduled this week
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function YieldCurveCard() {
   // Use React Query with same key as MarketTickerBar - automatic deduplication!
   const { data: curveData, isLoading: loading } = useQuery({
@@ -749,9 +849,9 @@ function YieldCurveCard() {
             ))}
           </div>
 
-          {/* Link to Treasury Explorer */}
-          <Link to="/research/treasury" className="block mt-2 pt-2 text-center text-xs text-indigo-600 hover:text-indigo-700 font-medium border-t border-gray-100">
-            Treasury Explorer →
+          {/* Link to Yield Curve Explorer */}
+          <Link to="/research/yield-curve" className="block mt-2 pt-2 text-center text-xs text-indigo-600 hover:text-indigo-700 font-medium border-t border-gray-100">
+            Yield Curve Explorer →
           </Link>
         </>
       )}
@@ -944,6 +1044,7 @@ function SectorJobsCard({ data }: { data: EmploymentDataProps }) {
 void LaborMarketCard;
 void SectorJobsCard;
 void JOLTSCard;
+void TrendBadge;
 
 function JOLTSCard() {
   return (
@@ -990,60 +1091,184 @@ function JOLTSCard() {
   );
 }
 
-function InflationCard() {
+// Types for Claims Card
+interface ClaimsSeriesData {
+  series_id: string;
+  name: string;
+  value: number;
+  date: string;
+  prior_value: number | null;
+  wow_change: number | null;
+  wow_pct: number | null;
+  year_ago_value: number | null;
+  yoy_change: number | null;
+  yoy_pct: number | null;
+}
+
+interface ClaimsOverviewData {
+  claims: {
+    icsa?: ClaimsSeriesData;
+    ccsa?: ClaimsSeriesData;
+    ic4wsa?: ClaimsSeriesData;
+  };
+}
+
+interface ClaimsTimelineData {
+  timeline: { date: string; icsa: number | null; ic4wsa: number | null }[];
+}
+
+function ClaimsCard() {
+  // Fetch claims overview
+  const { data: overview, isLoading: loadingOverview } = useQuery({
+    queryKey: ['claims-overview'],
+    queryFn: async () => {
+      const res = await claimsResearchAPI.getOverview<ClaimsOverviewData>();
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch claims timeline for chart
+  const { data: timeline } = useQuery({
+    queryKey: ['claims-timeline-short'],
+    queryFn: async () => {
+      const res = await claimsResearchAPI.getTimeline<ClaimsTimelineData>(52);
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const formatNumber = (value: number | null | undefined): string => {
+    if (value === null || value === undefined) return '--';
+    if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M`;
+    if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+    return value.toLocaleString();
+  };
+
+  const formatChange = (value: number | null | undefined): string => {
+    if (value === null || value === undefined) return '';
+    const sign = value >= 0 ? '+' : '';
+    if (Math.abs(value) >= 1000) return `${sign}${(value / 1000).toFixed(0)}K`;
+    return `${sign}${value.toLocaleString()}`;
+  };
+
+  const icsa = overview?.claims?.icsa;
+  const ic4wsa = overview?.claims?.ic4wsa;
+  const ccsa = overview?.claims?.ccsa;
+
+  // Prepare chart data
+  const chartData = timeline?.timeline?.map(t => ({
+    date: new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    icsa: t.icsa,
+    ic4wsa: t.ic4wsa,
+  })) || [];
+
+  // For claims, up is bad (more unemployment)
+  const icsaTrendColor = (icsa?.wow_change ?? 0) > 0 ? 'text-red-500' : 'text-green-500';
+  const TrendIcon = (icsa?.wow_change ?? 0) > 0 ? TrendingUp : TrendingDown;
+
+  if (loadingOverview) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[400px] flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[400px]">
+      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <DollarSign className="w-4 h-4 text-red-500" />
-          <h3 className="font-semibold text-gray-900 text-sm">Consumer Prices (CPI)</h3>
+          <Activity className="w-4 h-4 text-amber-600" />
+          <h3 className="font-semibold text-gray-900 text-sm">Unemployment Claims</h3>
         </div>
-        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded font-medium">Preview Wed</span>
+        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded font-medium">Weekly</span>
       </div>
 
-      {/* Headline vs Core */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-gray-600">Headline CPI</span>
-            <MiniSparkline data={inflationData.cpi.headline.trend} width={50} height={20} color="#6366f1" />
+      {/* Headline Numbers */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="bg-indigo-50 rounded-lg p-2">
+          <div className="text-[10px] text-gray-500 uppercase">Initial Claims</div>
+          <div className="text-lg font-bold text-gray-900">{formatNumber(icsa?.value)}</div>
+          <div className="flex items-center gap-1 text-xs">
+            <TrendIcon className={`w-3 h-3 ${icsaTrendColor}`} />
+            <span className={icsaTrendColor}>{formatChange(icsa?.wow_change)}</span>
           </div>
-          <div className="text-2xl font-bold text-gray-900">{inflationData.cpi.headline.value}%</div>
-          <div className="text-xs text-gray-500">YoY • Prior {inflationData.cpi.headline.prior}%</div>
         </div>
-        <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-gray-600">Core CPI</span>
-            <MiniSparkline data={inflationData.cpi.core.trend} width={50} height={20} color="#ef4444" />
+        <div className="bg-amber-50 rounded-lg p-2">
+          <div className="text-[10px] text-gray-500 uppercase">4-Week MA</div>
+          <div className="text-lg font-bold text-gray-900">{formatNumber(ic4wsa?.value)}</div>
+          <div className="text-xs text-gray-500">Trend</div>
+        </div>
+        <div className="bg-emerald-50 rounded-lg p-2">
+          <div className="text-[10px] text-gray-500 uppercase">Continued</div>
+          <div className="text-lg font-bold text-gray-900">{formatNumber(ccsa?.value)}</div>
+          <div className="flex items-center gap-1 text-xs">
+            <span className={(ccsa?.wow_change ?? 0) > 0 ? 'text-red-500' : 'text-green-500'}>
+              {formatChange(ccsa?.wow_change)}
+            </span>
           </div>
-          <div className="text-2xl font-bold text-gray-900">{inflationData.cpi.core.value}%</div>
-          <div className="text-xs text-gray-500">YoY • Unchanged</div>
         </div>
       </div>
 
-      {/* Components Table */}
-      <div className="text-xs">
-        <div className="grid grid-cols-12 gap-1 text-gray-500 border-b border-gray-100 pb-1 mb-1">
-          <div className="col-span-4">Component</div>
-          <div className="col-span-2 text-right">Weight</div>
-          <div className="col-span-2 text-right">YoY</div>
-          <div className="col-span-2 text-right">MoM</div>
-          <div className="col-span-2 text-center">Trend</div>
-        </div>
-        {inflationData.components.slice(0, 4).map((c, i) => (
-          <div key={i} className="grid grid-cols-12 gap-1 py-1 hover:bg-gray-50">
-            <div className="col-span-4 text-gray-700">{c.name}</div>
-            <div className="col-span-2 text-right text-gray-500">{c.weight}%</div>
-            <div className={`col-span-2 text-right font-medium ${c.yoy >= 3 ? 'text-red-500' : 'text-gray-900'}`}>{c.yoy}%</div>
-            <div className="col-span-2 text-right text-gray-600">{c.mom >= 0 ? '+' : ''}{c.mom}%</div>
-            <div className="col-span-2 text-center"><TrendBadge trend={c.trend as 'up' | 'down' | 'flat'} /></div>
-          </div>
-        ))}
+      {/* Chart */}
+      <div className="h-44 mb-2">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+            <defs>
+              <linearGradient id="claimsGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 9 }}
+              tickLine={false}
+              axisLine={false}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              tick={{ fontSize: 9 }}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`}
+              domain={['auto', 'auto']}
+            />
+            <Tooltip
+              contentStyle={{ fontSize: 11, borderRadius: 6 }}
+              formatter={(value: number) => [value?.toLocaleString(), '']}
+            />
+            <Area
+              type="monotone"
+              dataKey="icsa"
+              stroke="#6366f1"
+              strokeWidth={2}
+              fill="url(#claimsGradient)"
+              name="Initial Claims"
+            />
+            <Line
+              type="monotone"
+              dataKey="ic4wsa"
+              stroke="#f59e0b"
+              strokeWidth={2}
+              dot={false}
+              name="4-Week MA"
+            />
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
 
-      <Link to="/research/bls/cu" className="flex items-center justify-center gap-1 mt-3 pt-3 border-t border-gray-100 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
-        CPI Explorer <ChevronRight className="w-3 h-3" />
-      </Link>
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+        <span className="text-[10px] text-gray-400">
+          {icsa?.date ? `As of ${new Date(icsa.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+        </span>
+        <Link to="/research/claims" className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+          Explore <ChevronRight className="w-3 h-3" />
+        </Link>
+      </div>
     </div>
   );
 }
@@ -1478,7 +1703,7 @@ function GDPCard() {
         <div className="text-center text-gray-500 text-sm py-4">
           {error ? 'Failed to load GDP data' : 'No data available'}
         </div>
-        <Link to="/research/bea" className="flex items-center justify-center gap-1 mt-3 pt-3 border-t border-gray-100 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+        <Link to="/research/bea" className="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-gray-100 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
           GDP & BEA Data <ChevronRight className="w-3 h-3" />
         </Link>
       </div>
@@ -1504,7 +1729,7 @@ function GDPCard() {
             SAAR • Prior {gdpData.current.prior != null ? `${gdpData.current.prior.toFixed(1)}%` : 'N/A'}
           </div>
         </div>
-        <div className="flex-1 h-20">
+        <div className="flex-1 h-28">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={gdpData.trend} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
               <XAxis dataKey="q" tick={{ fontSize: 8, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
@@ -1744,6 +1969,26 @@ function AuctionResultsCard() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  // Format term to standard Treasury term (round to nearest)
+  const formatTerm = (term: string): string => {
+    const yearMatch = term.match(/(\d+)[- ]?Y/i) || term.match(/(\d+)[- ]?Year/i);
+    const monthMatch = term.match(/(\d+)[- ]?M/i) || term.match(/(\d+)[- ]?Month/i);
+    const weekMatch = term.match(/(\d+)[- ]?W/i) || term.match(/(\d+)[- ]?Week/i);
+
+    if (weekMatch) {
+      return `${weekMatch[1]}W`;
+    }
+
+    if (yearMatch) {
+      const years = parseInt(yearMatch[1]);
+      const months = monthMatch ? parseInt(monthMatch[1]) : 0;
+      const totalYears = Math.round(years + months / 12);
+      return `${totalYears}Y`;
+    }
+
+    return term;
+  };
+
   // Determine auction result based on bid-to-cover and tail
   const getAuctionResult = (btc: number | null, tail: number | null): string => {
     if (btc == null) return 'pending';
@@ -1752,56 +1997,87 @@ function AuctionResultsCard() {
     return 'neutral';
   };
 
+  // Get summary stats
+  const strongCount = auctions.filter(a => (a.auction_result || getAuctionResult(a.bid_to_cover_ratio, a.tail_bps)) === 'strong').length;
+  const weakCount = auctions.filter(a => (a.auction_result || getAuctionResult(a.bid_to_cover_ratio, a.tail_bps)) === 'weak').length;
+
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[400px] flex flex-col">
+      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Landmark className="w-4 h-4 text-indigo-600" />
           <h3 className="font-semibold text-gray-900 text-sm">Recent Auctions</h3>
         </div>
+        {!loading && auctions.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1 text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              {strongCount} strong
+            </span>
+            <span className="flex items-center gap-1 text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              {weakCount} weak
+            </span>
+          </div>
+        )}
       </div>
+
       {loading ? (
-        <div className="flex items-center justify-center h-32">
+        <div className="flex-1 flex items-center justify-center">
           <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="flex-1 overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-gray-500 border-b border-gray-100">
-                <th className="pb-2 text-left font-medium">Term</th>
-                <th className="pb-2 text-left font-medium">Date</th>
-                <th className="pb-2 text-right font-medium">Yield</th>
-                <th className="pb-2 text-right font-medium">BTC</th>
-                <th className="pb-2 text-right font-medium">Tail</th>
-                <th className="pb-2 text-center font-medium">Result</th>
+              <tr className="bg-gray-50 border-y border-gray-200">
+                <th className="py-2 px-2 text-left font-semibold text-gray-600 uppercase text-[10px] tracking-wide">Term</th>
+                <th className="py-2 px-2 text-left font-semibold text-gray-600 uppercase text-[10px] tracking-wide">Date</th>
+                <th className="py-2 px-2 text-right font-semibold text-gray-600 uppercase text-[10px] tracking-wide">Yield</th>
+                <th className="py-2 px-2 text-right font-semibold text-gray-600 uppercase text-[10px] tracking-wide">BTC</th>
+                <th className="py-2 px-2 text-right font-semibold text-gray-600 uppercase text-[10px] tracking-wide">Tail</th>
+                <th className="py-2 px-2 text-center font-semibold text-gray-600 uppercase text-[10px] tracking-wide">Result</th>
               </tr>
             </thead>
             <tbody>
-              {auctions.map((a) => {
+              {auctions.map((a, idx) => {
                 const result = a.auction_result || getAuctionResult(a.bid_to_cover_ratio, a.tail_bps);
                 return (
-                  <tr key={a.auction_id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-2 font-medium text-gray-900">
-                      {a.security_term.replace('-Year', 'Y').replace(' Month', 'M')}
+                  <tr
+                    key={a.auction_id}
+                    className={`hover:bg-indigo-50 transition-colors ${idx % 2 === 1 ? 'bg-gray-50/50' : ''}`}
+                  >
+                    <td className="py-2.5 px-2">
+                      <span className="font-semibold text-gray-900">
+                        {formatTerm(a.security_term)}
+                      </span>
                     </td>
-                    <td className="py-2 text-gray-600">{formatDate(a.auction_date)}</td>
-                    <td className="py-2 text-right text-gray-900">
-                      {a.high_yield != null ? `${a.high_yield.toFixed(3)}%` : '--'}
+                    <td className="py-2.5 px-2 text-gray-500">{formatDate(a.auction_date)}</td>
+                    <td className="py-2.5 px-2 text-right">
+                      <span className="font-mono font-medium text-gray-900">
+                        {a.high_yield != null ? `${a.high_yield.toFixed(3)}%` : '--'}
+                      </span>
                     </td>
-                    <td className="py-2 text-right text-gray-600">
-                      {a.bid_to_cover_ratio != null ? `${a.bid_to_cover_ratio.toFixed(2)}x` : '--'}
+                    <td className="py-2.5 px-2 text-right">
+                      <span className={`font-mono ${a.bid_to_cover_ratio != null && a.bid_to_cover_ratio >= 2.5 ? 'text-emerald-600 font-medium' : 'text-gray-600'}`}>
+                        {a.bid_to_cover_ratio != null ? `${a.bid_to_cover_ratio.toFixed(2)}x` : '--'}
+                      </span>
                     </td>
-                    <td className={`py-2 text-right font-medium ${a.tail_bps != null ? (a.tail_bps <= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-gray-400'}`}>
-                      {a.tail_bps != null ? `${a.tail_bps > 0 ? '+' : ''}${a.tail_bps.toFixed(1)}` : '--'}
+                    <td className="py-2.5 px-2 text-right">
+                      <span className={`font-mono font-medium ${a.tail_bps != null ? (a.tail_bps <= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-gray-400'}`}>
+                        {a.tail_bps != null ? `${a.tail_bps > 0 ? '+' : ''}${a.tail_bps.toFixed(1)}` : '--'}
+                      </span>
                     </td>
-                    <td className="py-2 text-center">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                    <td className="py-2.5 px-2 text-center">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                         result === 'strong' ? 'bg-emerald-100 text-emerald-700' :
                         result === 'weak' ? 'bg-red-100 text-red-700' :
-                        result === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-gray-100 text-gray-700'
+                        result === 'pending' ? 'bg-amber-100 text-amber-700' :
+                        'bg-gray-100 text-gray-600'
                       }`}>
+                        {result === 'strong' && <TrendingUp className="w-2.5 h-2.5" />}
+                        {result === 'weak' && <TrendingDown className="w-2.5 h-2.5" />}
                         {result}
                       </span>
                     </td>
@@ -1812,8 +2088,10 @@ function AuctionResultsCard() {
           </table>
         </div>
       )}
-      <Link to="/research/treasury/auctions" className="flex items-center justify-center gap-1 mt-3 pt-3 border-t border-gray-100 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
-        All Auctions <ChevronRight className="w-3 h-3" />
+
+      {/* Footer */}
+      <Link to="/research/treasury" className="flex items-center justify-center gap-1 mt-auto pt-3 border-t border-gray-100 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+        Treasury Explorer <ChevronRight className="w-3 h-3" />
       </Link>
     </div>
   );
@@ -1896,42 +2174,42 @@ function LNSlide({ data }: { data: CarouselData['ln'] }) {
   const lfpr = overview?.labor_force_participation;
 
   return (
-    <div className="grid grid-cols-3 gap-4 h-full">
+    <div className="grid grid-cols-3 gap-2 h-full">
       {/* Metrics */}
-      <div className="space-y-3">
-        <div className="bg-red-50 rounded-lg p-3 border border-red-100">
-          <div className="text-xs text-gray-500 mb-1">Unemployment Rate</div>
-          <div className="text-3xl font-bold text-gray-900">
+      <div className="space-y-2">
+        <div className="bg-red-50 rounded-lg p-2 border border-red-100">
+          <div className="text-[10px] text-gray-500">Unemployment Rate</div>
+          <div className="text-2xl font-bold text-gray-900">
             {unemployment?.latest_value?.toFixed(1) ?? '--'}%
           </div>
           {unemployment?.month_over_month != null && (
-            <div className={`text-sm ${unemployment.month_over_month > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-              {unemployment.month_over_month > 0 ? '↑' : '↓'} {Math.abs(unemployment.month_over_month).toFixed(2)}pp MoM
+            <div className={`text-xs ${unemployment.month_over_month > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+              {unemployment.month_over_month > 0 ? '↑' : '↓'} {Math.abs(unemployment.month_over_month).toFixed(2)}pp
             </div>
           )}
         </div>
-        <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-          <div className="text-xs text-gray-500 mb-1">Labor Force Participation</div>
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="bg-blue-50 rounded-lg p-2 border border-blue-100">
+          <div className="text-[10px] text-gray-500">Labor Force Participation</div>
+          <div className="text-xl font-bold text-gray-900">
             {lfpr?.latest_value?.toFixed(1) ?? '--'}%
           </div>
           {lfpr?.month_over_month != null && (
-            <div className={`text-xs ${lfpr.month_over_month < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-              {lfpr.month_over_month > 0 ? '↑' : '↓'} {Math.abs(lfpr.month_over_month).toFixed(2)}pp MoM
+            <div className={`text-[10px] ${lfpr.month_over_month < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+              {lfpr.month_over_month > 0 ? '↑' : '↓'} {Math.abs(lfpr.month_over_month).toFixed(2)}pp
             </div>
           )}
         </div>
-        <div className="text-xs text-gray-400 text-center">
+        <div className="text-[10px] text-gray-400 text-center">
           {unemployment?.latest_date || 'Latest data'}
         </div>
       </div>
 
       {/* Chart */}
       <div className="col-span-2">
-        <div className="text-xs font-medium text-gray-600 mb-2">Unemployment Rate Trend</div>
-        <div className="h-40">
+        <div className="text-[10px] font-medium text-gray-600 mb-1">Unemployment Rate Trend</div>
+        <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={timeline} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+            <AreaChart data={timeline} margin={{ top: 5, right: 5, bottom: 5, left: -5 }}>
               <defs>
                 <linearGradient id="lnGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#dc2626" stopOpacity={0.3} />
@@ -1939,7 +2217,7 @@ function LNSlide({ data }: { data: CarouselData['ln'] }) {
                 </linearGradient>
               </defs>
               <XAxis dataKey="period_name" tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={35} domain={['auto', 'auto']} tickFormatter={(v) => `${v}%`} />
+              <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={32} domain={['auto', 'auto']} tickFormatter={(v) => `${v}%`} />
               <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }} formatter={(value: number) => [`${value?.toFixed(1)}%`, 'Unemployment']} />
               <Area type="monotone" dataKey="headline_value" stroke="#dc2626" fill="url(#lnGradient)" strokeWidth={2} />
             </AreaChart>
@@ -1957,48 +2235,48 @@ function CESlide({ data }: { data: CarouselData['ce'] }) {
   const topSectors = supersectors
     .filter(s => s.month_over_month != null)
     .sort((a, b) => (b.month_over_month || 0) - (a.month_over_month || 0))
-    .slice(0, 5);
+    .slice(0, 6);
 
   return (
-    <div className="grid grid-cols-3 gap-4 h-full">
+    <div className="grid grid-cols-3 gap-2 h-full">
       {/* Metrics */}
-      <div className="space-y-3">
-        <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-          <div className="text-xs text-gray-500 mb-1">Nonfarm Payrolls</div>
-          <div className="text-3xl font-bold text-gray-900">
+      <div className="space-y-2">
+        <div className="bg-blue-50 rounded-lg p-2 border border-blue-100">
+          <div className="text-[10px] text-gray-500">Nonfarm Payrolls</div>
+          <div className="text-2xl font-bold text-gray-900">
             {payrollsChange != null ? `${payrollsChange >= 0 ? '+' : ''}${payrollsChange.toFixed(0)}K` : '--'}
           </div>
-          <div className="text-xs text-gray-500">MoM change</div>
+          <div className="text-[10px] text-gray-500">MoM change</div>
         </div>
-        <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
-          <div className="text-xs text-gray-500 mb-1">Total Employment</div>
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="bg-indigo-50 rounded-lg p-2 border border-indigo-100">
+          <div className="text-[10px] text-gray-500">Total Employment</div>
+          <div className="text-xl font-bold text-gray-900">
             {totalNonfarm?.latest_value ? `${(totalNonfarm.latest_value / 1000).toFixed(1)}M` : '--'}
           </div>
-          <div className="text-xs text-gray-500">jobs</div>
+          <div className="text-[10px] text-gray-500">jobs</div>
         </div>
-        <div className="text-xs text-gray-400 text-center">
+        <div className="text-[10px] text-gray-400 text-center">
           {totalNonfarm?.latest_date || 'Latest data'}
         </div>
       </div>
 
       {/* Sector changes */}
       <div className="col-span-2">
-        <div className="text-xs font-medium text-gray-600 mb-2">Jobs by Sector (MoM, 000s)</div>
-        <div className="space-y-2">
+        <div className="text-[10px] font-medium text-gray-600 mb-1">Jobs by Sector (MoM, 000s)</div>
+        <div className="space-y-1.5">
           {topSectors.map((sector, i) => {
             const change = sector.month_over_month || 0;
             const maxChange = Math.max(...topSectors.map(s => Math.abs(s.month_over_month || 0)), 1);
             return (
-              <div key={i} className="flex items-center gap-2">
-                <div className="w-28 text-xs text-gray-600 truncate">{sector.supersector_name.replace(' and ', ' & ')}</div>
-                <div className="flex-1 h-4 bg-gray-100 rounded relative overflow-hidden">
+              <div key={i} className="flex items-center gap-1.5">
+                <div className="w-24 text-[10px] text-gray-600 truncate">{sector.supersector_name.replace(' and ', ' & ')}</div>
+                <div className="flex-1 h-5 bg-gray-100 rounded relative overflow-hidden">
                   <div
                     className={`absolute h-full rounded ${change >= 0 ? 'bg-emerald-500' : 'bg-red-400'}`}
                     style={{ width: `${(Math.abs(change) / maxChange) * 100}%` }}
                   />
                 </div>
-                <div className={`w-12 text-xs font-medium text-right ${change >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                <div className={`w-10 text-[10px] font-semibold text-right ${change >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                   {change >= 0 ? '+' : ''}{change.toFixed(0)}
                 </div>
               </div>
@@ -2024,12 +2302,12 @@ function JTSlide({ data }: { data: CarouselData['jt'] }) {
   const quitsRate = overview?.quits_rate;
 
   return (
-    <div className="grid grid-cols-3 gap-4 h-full">
+    <div className="grid grid-cols-3 gap-2 h-full">
       {/* Metrics */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <div className="bg-amber-50 rounded-lg p-2 border border-amber-100">
           <div className="text-[10px] text-gray-500">Job Openings</div>
-          <div className="text-xl font-bold text-gray-900">
+          <div className="text-lg font-bold text-gray-900">
             {openingsLevel != null ? `${(openingsLevel / 1000).toFixed(1)}M` : (openingsRate?.value?.toFixed(1) ?? '--')}
             {openingsLevel == null && openingsRate?.value != null && '%'}
           </div>
@@ -2041,7 +2319,7 @@ function JTSlide({ data }: { data: CarouselData['jt'] }) {
         </div>
         <div className="bg-blue-50 rounded-lg p-2 border border-blue-100">
           <div className="text-[10px] text-gray-500">Hires Rate</div>
-          <div className="text-xl font-bold text-gray-900">
+          <div className="text-lg font-bold text-gray-900">
             {hiresLevel != null ? `${(hiresLevel / 1000).toFixed(1)}M` : (hiresRate?.value?.toFixed(1) ?? '--')}
             {hiresLevel == null && hiresRate?.value != null && '%'}
           </div>
@@ -2053,7 +2331,7 @@ function JTSlide({ data }: { data: CarouselData['jt'] }) {
         </div>
         <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-100">
           <div className="text-[10px] text-gray-500">Quits Rate</div>
-          <div className="text-xl font-bold text-gray-900">
+          <div className="text-lg font-bold text-gray-900">
             {quitsLevel != null ? `${(quitsLevel / 1000).toFixed(1)}M` : (quitsRate?.value?.toFixed(1) ?? '--')}
             {quitsLevel == null && quitsRate?.value != null && '%'}
           </div>
@@ -2063,19 +2341,19 @@ function JTSlide({ data }: { data: CarouselData['jt'] }) {
             </div>
           )}
         </div>
-        <div className="text-xs text-gray-400 text-center">
+        <div className="text-[10px] text-gray-400 text-center">
           {openingsRate?.latest_date || overview?.last_updated || 'Latest data'}
         </div>
       </div>
 
       {/* Chart - using rates */}
       <div className="col-span-2">
-        <div className="text-xs font-medium text-gray-600 mb-2">JOLTS Rates (%)</div>
-        <div className="h-40">
+        <div className="text-[10px] font-medium text-gray-600 mb-1">JOLTS Rates (%)</div>
+        <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={timeline} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+            <AreaChart data={timeline} margin={{ top: 5, right: 5, bottom: 5, left: -5 }}>
               <XAxis dataKey="period_name" tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={35} tickFormatter={(v) => `${v}%`} />
+              <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={32} tickFormatter={(v) => `${v}%`} />
               <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }} formatter={(value: number) => [`${value?.toFixed(1)}%`]} />
               <Area type="monotone" dataKey="job_openings_rate" stroke="#f59e0b" fill="#fef3c7" strokeWidth={2} name="Openings" />
               <Area type="monotone" dataKey="hires_rate" stroke="#2563eb" fill="#dbeafe" strokeWidth={1.5} name="Hires" />
@@ -2094,42 +2372,42 @@ function CUSlide({ data }: { data: CarouselData['cu'] }) {
   const core = overview?.core_cpi;
 
   return (
-    <div className="grid grid-cols-3 gap-4 h-full">
+    <div className="grid grid-cols-3 gap-2 h-full">
       {/* Metrics */}
-      <div className="space-y-3">
-        <div className="bg-red-50 rounded-lg p-3 border border-red-100">
-          <div className="text-xs text-gray-500 mb-1">Headline CPI YoY</div>
-          <div className="text-3xl font-bold text-gray-900">
+      <div className="space-y-2">
+        <div className="bg-red-50 rounded-lg p-2 border border-red-100">
+          <div className="text-[10px] text-gray-500">Headline CPI YoY</div>
+          <div className="text-2xl font-bold text-gray-900">
             {headline?.year_over_year?.toFixed(1) ?? '--'}%
           </div>
           {headline?.month_over_month != null && (
-            <div className="text-xs text-gray-500">
+            <div className="text-[10px] text-gray-500">
               {headline.month_over_month >= 0 ? '+' : ''}{headline.month_over_month.toFixed(2)}% MoM
             </div>
           )}
         </div>
-        <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
-          <div className="text-xs text-gray-500 mb-1">Core CPI YoY</div>
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="bg-purple-50 rounded-lg p-2 border border-purple-100">
+          <div className="text-[10px] text-gray-500">Core CPI YoY</div>
+          <div className="text-xl font-bold text-gray-900">
             {core?.year_over_year?.toFixed(1) ?? '--'}%
           </div>
           {core?.month_over_month != null && (
-            <div className="text-xs text-gray-500">
+            <div className="text-[10px] text-gray-500">
               {core.month_over_month >= 0 ? '+' : ''}{core.month_over_month.toFixed(2)}% MoM
             </div>
           )}
         </div>
-        <div className="text-xs text-gray-400 text-center">
+        <div className="text-[10px] text-gray-400 text-center">
           {headline?.latest_date || 'Latest data'}
         </div>
       </div>
 
       {/* Chart */}
       <div className="col-span-2">
-        <div className="text-xs font-medium text-gray-600 mb-2">Inflation Rate (YoY %)</div>
-        <div className="h-40">
+        <div className="text-[10px] font-medium text-gray-600 mb-1">Inflation Rate (YoY %)</div>
+        <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={timeline} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+            <AreaChart data={timeline} margin={{ top: 5, right: 5, bottom: 5, left: -5 }}>
               <defs>
                 <linearGradient id="cuHeadlineGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#ef4444" stopOpacity={0.3} />
@@ -2137,7 +2415,7 @@ function CUSlide({ data }: { data: CarouselData['cu'] }) {
                 </linearGradient>
               </defs>
               <XAxis dataKey="period_name" tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={35} tickFormatter={(v) => `${v}%`} />
+              <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={32} tickFormatter={(v) => `${v}%`} />
               <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }} formatter={(value: number) => [`${value?.toFixed(2)}%`]} />
               <Area type="monotone" dataKey="headline_yoy" stroke="#ef4444" fill="url(#cuHeadlineGradient)" strokeWidth={2} name="Headline" />
               <Line type="monotone" dataKey="core_yoy" stroke="#8b5cf6" strokeWidth={2} dot={false} name="Core" />
@@ -2158,12 +2436,12 @@ function WPSlide({ data }: { data: CarouselData['wp'] }) {
   const services = components.find(c => c.name?.toLowerCase().includes('services'));
 
   return (
-    <div className="grid grid-cols-3 gap-4 h-full">
+    <div className="grid grid-cols-3 gap-2 h-full">
       {/* Metrics */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <div className="bg-purple-50 rounded-lg p-2 border border-purple-100">
           <div className="text-[10px] text-gray-500">Final Demand YoY</div>
-          <div className="text-2xl font-bold text-gray-900">
+          <div className="text-xl font-bold text-gray-900">
             {headline?.yoy_pct?.toFixed(1) ?? '--'}%
           </div>
           {headline?.mom_pct != null && (
@@ -2172,43 +2450,43 @@ function WPSlide({ data }: { data: CarouselData['wp'] }) {
             </div>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-1.5">
           <div className="bg-blue-50 rounded-lg p-2 border border-blue-100">
             <div className="text-[10px] text-gray-500">Goods</div>
-            <div className="text-lg font-bold text-gray-900">
+            <div className="text-base font-bold text-gray-900">
               {goods?.yoy_pct?.toFixed(1) ?? '--'}%
             </div>
           </div>
           <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-100">
             <div className="text-[10px] text-gray-500">Services</div>
-            <div className="text-lg font-bold text-gray-900">
+            <div className="text-base font-bold text-gray-900">
               {services?.yoy_pct?.toFixed(1) ?? '--'}%
             </div>
           </div>
         </div>
-        <div className="text-xs text-gray-400 text-center">
+        <div className="text-[10px] text-gray-400 text-center">
           {headline?.latest_date || overview?.last_updated || 'Latest data'}
         </div>
       </div>
 
       {/* Chart - show components breakdown */}
       <div className="col-span-2">
-        <div className="text-xs font-medium text-gray-600 mb-2">PPI Components (YoY %)</div>
+        <div className="text-[10px] font-medium text-gray-600 mb-1">PPI Components (YoY %)</div>
         {components.length > 0 ? (
-          <div className="space-y-2">
-            {components.slice(0, 5).map((comp, i) => {
+          <div className="space-y-1.5">
+            {components.slice(0, 6).map((comp, i) => {
               const maxYoy = Math.max(...components.map(c => Math.abs(c.yoy_pct || 0)), 1);
               const yoy = comp.yoy_pct || 0;
               return (
-                <div key={i} className="flex items-center gap-2">
-                  <div className="w-32 text-xs text-gray-600 truncate" title={comp.name}>{comp.name}</div>
-                  <div className="flex-1 h-4 bg-gray-100 rounded relative overflow-hidden">
+                <div key={i} className="flex items-center gap-1.5">
+                  <div className="w-28 text-[10px] text-gray-600 truncate" title={comp.name}>{comp.name}</div>
+                  <div className="flex-1 h-5 bg-gray-100 rounded relative overflow-hidden">
                     <div
                       className={`absolute h-full rounded ${yoy >= 0 ? 'bg-purple-500' : 'bg-red-400'}`}
                       style={{ width: `${(Math.abs(yoy) / maxYoy) * 100}%` }}
                     />
                   </div>
-                  <div className={`w-14 text-xs font-medium text-right ${yoy >= 0 ? 'text-purple-600' : 'text-red-500'}`}>
+                  <div className={`w-12 text-[10px] font-semibold text-right ${yoy >= 0 ? 'text-purple-600' : 'text-red-500'}`}>
                     {yoy >= 0 ? '+' : ''}{yoy.toFixed(1)}%
                   </div>
                 </div>
@@ -2216,9 +2494,9 @@ function WPSlide({ data }: { data: CarouselData['wp'] }) {
             })}
           </div>
         ) : (
-          <div className="h-40 flex items-center justify-center">
+          <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={timeline} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+              <AreaChart data={timeline} margin={{ top: 5, right: 5, bottom: 5, left: -5 }}>
                 <defs>
                   <linearGradient id="wpGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.3} />
@@ -2226,7 +2504,7 @@ function WPSlide({ data }: { data: CarouselData['wp'] }) {
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="period_name" tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={35} tickFormatter={(v) => `${v}%`} />
+                <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={32} tickFormatter={(v) => `${v}%`} />
                 <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }} formatter={(value: number) => [`${value?.toFixed(2)}%`]} />
                 <Area type="monotone" dataKey="final_demand_yoy" stroke="#8b5cf6" fill="url(#wpGradient)" strokeWidth={2} name="Final Demand" />
               </AreaChart>
@@ -2262,19 +2540,19 @@ function LASlide({ data }: { data: CarouselData['la'] }) {
   const lowestStates = sortedStates.slice(-3).reverse();
 
   return (
-    <div className="grid grid-cols-3 gap-3 h-full">
+    <div className="grid grid-cols-3 gap-2 h-full">
       {/* Rankings sidebar */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <div className="bg-red-50 rounded-lg p-2 border border-red-100">
-          <div className="text-[10px] text-red-700 font-medium mb-1">Highest Rates</div>
+          <div className="text-[10px] text-red-700 font-medium mb-0.5">Highest Rates</div>
           {(rankings?.highest || highestStates.map(s => `${s.area_name}: ${s.unemployment_rate?.toFixed(1)}%`)).slice(0, 3).map((name, i) => (
-            <div key={i} className="text-xs text-gray-700 truncate">{i + 1}. {name}</div>
+            <div key={i} className="text-[10px] text-gray-700 truncate">{i + 1}. {name}</div>
           ))}
         </div>
         <div className="bg-green-50 rounded-lg p-2 border border-green-100">
-          <div className="text-[10px] text-green-700 font-medium mb-1">Lowest Rates</div>
+          <div className="text-[10px] text-green-700 font-medium mb-0.5">Lowest Rates</div>
           {(rankings?.lowest || lowestStates.map(s => `${s.area_name}: ${s.unemployment_rate?.toFixed(1)}%`)).slice(0, 3).map((name, i) => (
-            <div key={i} className="text-xs text-gray-700 truncate">{i + 1}. {name}</div>
+            <div key={i} className="text-[10px] text-gray-700 truncate">{i + 1}. {name}</div>
           ))}
         </div>
         {/* Color legend */}
@@ -2297,7 +2575,7 @@ function LASlide({ data }: { data: CarouselData['la'] }) {
       </div>
 
       {/* Map */}
-      <div className="col-span-2 h-full min-h-[180px]">
+      <div className="col-span-2 h-full min-h-[200px]">
         {states.length > 0 ? (
           <div className="h-full rounded-lg overflow-hidden border border-gray-200">
             <MapContainer
@@ -2363,48 +2641,48 @@ function PCSlide({ data }: { data: CarouselData['pc'] }) {
   const sortedSectors = [...sectors]
     .filter(s => s.yoy_pct != null)
     .sort((a, b) => Math.abs(b.yoy_pct || 0) - Math.abs(a.yoy_pct || 0))
-    .slice(0, 6);
+    .slice(0, 7);
 
   // Get latest date from first sector
   const latestDate = sectors[0]?.latest_date;
 
   return (
-    <div className="grid grid-cols-3 gap-4 h-full">
+    <div className="grid grid-cols-3 gap-2 h-full">
       {/* Summary metrics */}
-      <div className="space-y-3">
-        <div className="bg-cyan-50 rounded-lg p-3 border border-cyan-100">
-          <div className="text-xs text-gray-500 mb-1">PPI by Industry</div>
-          <div className="text-2xl font-bold text-gray-900">
+      <div className="space-y-2">
+        <div className="bg-cyan-50 rounded-lg p-2 border border-cyan-100">
+          <div className="text-[10px] text-gray-500">PPI by Industry</div>
+          <div className="text-xl font-bold text-gray-900">
             {sectors.length > 0 ? `${sectors.length} Sectors` : '--'}
           </div>
-          <div className="text-xs text-gray-500">tracked</div>
+          <div className="text-[10px] text-gray-500">tracked</div>
         </div>
-        <div className="text-xs text-gray-400 text-center">
+        <div className="text-[10px] text-gray-400 text-center">
           {latestDate || 'Latest data'}
         </div>
-        <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
+        <div className="text-[10px] text-gray-500 p-2 bg-gray-50 rounded">
           Producer prices by NAICS industry classification. Shows YoY % change.
         </div>
       </div>
 
       {/* Sector breakdown */}
       <div className="col-span-2">
-        <div className="text-xs font-medium text-gray-600 mb-2">Sectors by YoY Change</div>
+        <div className="text-[10px] font-medium text-gray-600 mb-1">Sectors by YoY Change</div>
         {sortedSectors.length > 0 ? (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {sortedSectors.map((sector, i) => {
               const maxYoy = Math.max(...sortedSectors.map(s => Math.abs(s.yoy_pct || 0)), 1);
               const yoy = sector.yoy_pct || 0;
               return (
-                <div key={i} className="flex items-center gap-2">
-                  <div className="w-32 text-xs text-gray-600 truncate" title={sector.sector_name}>{sector.sector_name}</div>
-                  <div className="flex-1 h-4 bg-gray-100 rounded relative overflow-hidden">
+                <div key={i} className="flex items-center gap-1.5">
+                  <div className="w-28 text-[10px] text-gray-600 truncate" title={sector.sector_name}>{sector.sector_name}</div>
+                  <div className="flex-1 h-5 bg-gray-100 rounded relative overflow-hidden">
                     <div
                       className={`absolute h-full rounded ${yoy >= 0 ? 'bg-cyan-500' : 'bg-red-400'}`}
                       style={{ width: `${(Math.abs(yoy) / maxYoy) * 100}%` }}
                     />
                   </div>
-                  <div className={`w-14 text-xs font-medium text-right ${yoy >= 0 ? 'text-cyan-600' : 'text-red-500'}`}>
+                  <div className={`w-12 text-[10px] font-semibold text-right ${yoy >= 0 ? 'text-cyan-600' : 'text-red-500'}`}>
                     {yoy >= 0 ? '+' : ''}{yoy.toFixed(1)}%
                   </div>
                 </div>
@@ -2412,10 +2690,10 @@ function PCSlide({ data }: { data: CarouselData['pc'] }) {
             })}
           </div>
         ) : (
-          <div className="h-40 flex items-center justify-center bg-gray-50 rounded-lg">
+          <div className="h-48 flex items-center justify-center bg-gray-50 rounded-lg">
             <div className="text-center">
-              <Truck className="w-10 h-10 text-cyan-400 mx-auto mb-2" />
-              <div className="text-sm text-gray-600">Industry-level PPI data</div>
+              <Truck className="w-8 h-8 text-cyan-400 mx-auto mb-2" />
+              <div className="text-xs text-gray-600">Industry-level PPI data</div>
               <Link to="/research/bls/pc" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
                 Explore all industries →
               </Link>
@@ -2537,7 +2815,7 @@ function SurveyCarousel({ data }: { data: CarouselData }) {
       </div>
 
       {/* Content */}
-      <div className="p-4 min-h-[280px]">
+      <div className="px-3 py-2 min-h-[260px]">
         {renderSlide()}
       </div>
 
@@ -2715,7 +2993,7 @@ export default function Research(): React.ReactElement {
             {/* Employment & Inflation Row */}
             <div className="grid grid-cols-2 gap-4">
               <EmploymentTabbedCard />
-              <InflationCard />
+              <ClaimsCard />
             </div>
 
             {/* GDP & Auctions Row */}
@@ -2733,28 +3011,8 @@ export default function Research(): React.ReactElement {
             <YieldCurveCard />
             <CalendarCard />
 
-            {/* Quick Stats */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <h3 className="font-semibold text-gray-900 text-sm mb-3">Key Spreads & Rates</h3>
-              <div className="space-y-3">
-                {[
-                  { label: '2s10s Spread', value: '+3 bps', note: 'First positive since Jul 2022', positive: true },
-                  { label: 'Fed Funds Target', value: '4.50-4.75%', note: '85% odds of Dec cut', positive: false },
-                  { label: '10Y Real Yield', value: '1.92%', note: 'TIPS-implied', positive: false },
-                  { label: '10Y Breakeven', value: '2.26%', note: 'Inflation expectations', positive: false },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                    <div>
-                      <div className="text-xs text-gray-600">{item.label}</div>
-                      <div className="text-[10px] text-gray-400">{item.note}</div>
-                    </div>
-                    <div className={`text-sm font-semibold ${item.positive ? 'text-emerald-600' : 'text-gray-900'}`}>
-                      {item.value}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* FRED Release Calendar */}
+            <FREDCalendarCard />
 
             {/* Coming Soon */}
             <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">

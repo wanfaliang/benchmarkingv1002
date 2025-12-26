@@ -78,7 +78,13 @@ from .treasury_models import (
 
 # FRED Models
 from .fred_models import (
+    FredSource,
+    FredRelease,
+    FredReleaseDate,
+    FredCategory,
     FredSeries,
+    FredSeriesRelease,
+    FredSeriesCategory,
     FredObservationLatest,
     FredObservationRealtime,
 )
@@ -291,7 +297,13 @@ __all__ = [
     "TreasuryDailyRate",
     "TreasuryAuctionSchedule",
     # FRED
+    "FredSource",
+    "FredRelease",
+    "FredReleaseDate",
+    "FredCategory",
     "FredSeries",
+    "FredSeriesRelease",
+    "FredSeriesCategory",
     "FredObservationLatest",
     "FredObservationRealtime",
     # BLS

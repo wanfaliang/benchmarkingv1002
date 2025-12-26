@@ -10,6 +10,11 @@ import secrets
 from .api import auth, tickers, analyses, websocket, datasets
 from .api.research import treasury as treasury_research
 from .api.research import fred_explorer as fred_research
+from .api.research import fred_claims_explorer as fred_claims_research
+from .api.research import fred_fedfunds_explorer as fred_fedfunds_research
+from .api.research import fred_sentiment_explorer as fred_sentiment_research
+from .api.research import fred_leading_explorer as fred_leading_research
+from .api.research import fred_housing_explorer as fred_housing_research
 from .api.research.bls import cu_explorer as cu_research
 from .api.research.bls import ln_explorer as ln_research
 from .api.research.bls import la_explorer as la_research
@@ -32,6 +37,7 @@ from .api.research import portal_api as portal_research
 from .api.research import market_indices as market_research
 from .api.research import economic_calendar as calendar_research
 from .api.research import bea_explorer as bea_research
+from .api.research import fred_calendar as fred_calendar_research
 from .api.research.market_indices import start_polling, get_market_status
 from .config import settings
 
@@ -87,6 +93,11 @@ app.include_router(datasets.router)
 # Research module routers (DATA database)
 app.include_router(treasury_research.router)
 app.include_router(fred_research.router)
+app.include_router(fred_claims_research.router)
+app.include_router(fred_fedfunds_research.router)
+app.include_router(fred_sentiment_research.router)
+app.include_router(fred_leading_research.router)
+app.include_router(fred_housing_research.router)
 app.include_router(cu_research.router)
 app.include_router(ln_research.router)
 app.include_router(la_research.router)
@@ -117,6 +128,9 @@ app.include_router(calendar_research.router)
 
 # BEA (Bureau of Economic Analysis) API
 app.include_router(bea_research.router)
+
+# FRED Calendar API
+app.include_router(fred_calendar_research.router)
 
 def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
     """

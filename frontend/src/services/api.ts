@@ -410,7 +410,7 @@ export const treasuryResearchAPI = {
 
   compareTerms: <T = unknown>(terms: string[], years: number = 5): Promise<AxiosResponse<T>> =>
     api.get('/api/research/treasury/compare', {
-      params: { terms, years },
+      params: { terms: terms.join(','), years },
     }),
 
   getSnapshot: <T = unknown>(): Promise<AxiosResponse<T>> =>
@@ -430,6 +430,169 @@ export const fredResearchAPI = {
 
   getSpreadHistory: <T = unknown>(spread: string = '2s10s', days: number = 365): Promise<AxiosResponse<T>> =>
     api.get('/api/research/fred/yield-curve/spread-history', { params: { spread, days } }),
+};
+
+// ============================================================================
+// Research Module - FRED Claims Explorer (ICSA, CCSA)
+// ============================================================================
+
+export const claimsResearchAPI = {
+  getOverview: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/claims/overview'),
+
+  getTimeline: <T = unknown>(weeksBack: number = 104): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/claims/overview/timeline', { params: { weeks_back: weeksBack } }),
+
+  getSeries: <T = unknown>(seriesId: string, weeksBack: number = 104): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred/claims/series/${seriesId}`, { params: { weeks_back: weeksBack } }),
+
+  compare: <T = unknown>(weeksBack: number = 52): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/claims/compare', { params: { weeks_back: weeksBack } }),
+
+  // State-level claims data
+  getStatesOverview: <T = unknown>(weeksBack: number = 52): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/claims/states/overview', { params: { weeks_back: weeksBack } }),
+
+  getStateDetails: <T = unknown>(stateCode: string, weeksBack: number = 104): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred/claims/states/${stateCode}`, { params: { weeks_back: weeksBack } }),
+
+  getStateRankings: <T = unknown>(metric: string): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred/claims/states/rankings/${metric}`),
+};
+
+// ============================================================================
+// Research Module - FRED Fed Funds Rate Explorer
+// ============================================================================
+
+export const fedfundsResearchAPI = {
+  getOverview: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/fedfunds/overview'),
+
+  getTimeline: <T = unknown>(yearsBack: number = 5): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/fedfunds/timeline', { params: { years_back: yearsBack } }),
+
+  getChanges: <T = unknown>(yearsBack: number = 20): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/fedfunds/changes', { params: { years_back: yearsBack } }),
+
+  getSeries: <T = unknown>(seriesId: string, daysBack: number = 365): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred/fedfunds/series/${seriesId}`, { params: { days_back: daysBack } }),
+
+  compareEffective: <T = unknown>(daysBack: number = 365): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/fedfunds/compare-effective', { params: { days_back: daysBack } }),
+
+  getHistoricalTable: <T = unknown>(yearsBack: number = 5, frequency: string = 'monthly'): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/fedfunds/historical-table', { params: { years_back: yearsBack, frequency } }),
+
+  getSiblingsSeries: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/fedfunds/sibling-series'),
+
+  getAbout: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/fedfunds/about'),
+};
+
+// ============================================================================
+// Research Module - FRED Consumer Sentiment Explorer
+// ============================================================================
+
+export const sentimentResearchAPI = {
+  getOverview: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/sentiment/overview'),
+
+  getTimeline: <T = unknown>(monthsBack: number = 60): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/sentiment/timeline', { params: { months_back: monthsBack } }),
+
+  comparePeriods: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/sentiment/compare-periods'),
+
+  getSeries: <T = unknown>(seriesId: string, monthsBack: number = 60): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred/sentiment/series/${seriesId}`, { params: { months_back: monthsBack } }),
+
+  getCorrelation: <T = unknown>(monthsBack: number = 120): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/sentiment/correlation', { params: { months_back: monthsBack } }),
+};
+
+// ============================================================================
+// Research Module - FRED Leading Index & Recession Explorer
+// ============================================================================
+
+export const leadingResearchAPI = {
+  getOverview: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/leading/overview'),
+
+  getTimeline: <T = unknown>(monthsBack: number = 120): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/leading/timeline', { params: { months_back: monthsBack } }),
+
+  getRecessions: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/leading/recessions'),
+
+  getSignals: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/leading/signals'),
+
+  getSeries: <T = unknown>(seriesId: string, monthsBack: number = 120): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred/leading/series/${seriesId}`, { params: { months_back: monthsBack } }),
+};
+
+// ============================================================================
+// Research Module - FRED Housing Market Explorer
+// ============================================================================
+
+export const housingResearchAPI = {
+  getOverview: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/housing/overview'),
+
+  getTimeline: <T = unknown>(monthsBack: number = 60): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/housing/timeline', { params: { months_back: monthsBack } }),
+
+  getMortgageRates: <T = unknown>(monthsBack: number = 60): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/housing/mortgage-rates', { params: { months_back: monthsBack } }),
+
+  getRegional: <T = unknown>(monthsBack: number = 60): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/housing/regional', { params: { months_back: monthsBack } }),
+
+  compareStartsPermits: <T = unknown>(monthsBack: number = 120): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/housing/compare-starts-permits', { params: { months_back: monthsBack } }),
+
+  getSeries: <T = unknown>(seriesId: string, monthsBack: number = 60): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred/housing/series/${seriesId}`, { params: { months_back: monthsBack } }),
+};
+
+// ============================================================================
+// Research Module - FRED Calendar (Release Schedule)
+// ============================================================================
+
+export const fredCalendarAPI = {
+  getStats: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred-calendar/stats'),
+
+  getUpcoming: <T = unknown>(days: number = 7): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred-calendar/upcoming', { params: { days } }),
+
+  getMonth: <T = unknown>(year: number, month: number): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred-calendar/month/${year}/${month}`),
+
+  getRange: <T = unknown>(start: string, end: string): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred-calendar/range', { params: { start, end } }),
+
+  getToday: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred-calendar/today'),
+
+  getWeek: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred-calendar/week'),
+
+  getAllReleases: <T = unknown>(): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred-calendar/releases'),
+
+  getReleaseDates: <T = unknown>(releaseId: number, limit: number = 50): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred-calendar/release/${releaseId}/dates`, { params: { limit } }),
+
+  getReleaseSeries: <T = unknown>(releaseId: number, params: { offset?: number; limit?: number; search?: string } = {}): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred-calendar/release/${releaseId}/series`, { params }),
+
+  getSeriesDetail: <T = unknown>(seriesId: string): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred-calendar/series/${seriesId}`),
+
+  getSeriesObservations: <T = unknown>(seriesId: string, params: { start_date?: string; end_date?: string; limit?: number } = {}): Promise<AxiosResponse<T>> =>
+    api.get(`/api/research/fred-calendar/series/${seriesId}/observations`, { params }),
 };
 
 // ============================================================================
@@ -574,7 +737,7 @@ export const laResearchAPI = {
     api.get('/api/research/bls/la/states/timeline', {
       params: {
         months_back: monthsBack,
-        ...(stateCodes && { state_codes: stateCodes }),
+        ...(stateCodes && { state_codes: stateCodes.join(',') }),
       },
     }),
 
@@ -590,7 +753,7 @@ export const laResearchAPI = {
       params: {
         months_back: monthsBack,
         limit,
-        ...(metroCodes && { metro_codes: metroCodes }),
+        ...(metroCodes && { metro_codes: metroCodes.join(',') }),
       },
     }),
 };
@@ -628,7 +791,7 @@ export const ceResearchAPI = {
 
   getIndustriesTimeline: <T = unknown>(industryCodes: string[], monthsBack: number = 24): Promise<AxiosResponse<T>> =>
     api.get('/api/research/bls/ce/industries/timeline', {
-      params: { industry_codes: industryCodes, months_back: monthsBack },
+      params: { industry_codes: industryCodes.join(','), months_back: monthsBack },
     }),
 
   getDataTypes: <T = unknown>(industryCode: string): Promise<AxiosResponse<T>> =>
@@ -675,7 +838,7 @@ export const pcResearchAPI = {
     api.get('/api/research/bls/pc/sectors/timeline', {
       params: {
         months_back: monthsBack,
-        ...(sectorCodes && { sector_codes: sectorCodes }),
+        ...(sectorCodes && { sector_codes: sectorCodes.join(',') }),
       },
     }),
 
@@ -686,7 +849,7 @@ export const pcResearchAPI = {
 
   getIndustriesTimeline: <T = unknown>(industryCodes: string[], monthsBack: number = 24): Promise<AxiosResponse<T>> =>
     api.get('/api/research/bls/pc/industries/timeline', {
-      params: { industry_codes: industryCodes, months_back: monthsBack },
+      params: { industry_codes: industryCodes.join(','), months_back: monthsBack },
     }),
 
   getProducts: <T = unknown>(industryCode: string, limit: number = 50): Promise<AxiosResponse<T>> =>
@@ -702,7 +865,7 @@ export const pcResearchAPI = {
     api.get(`/api/research/bls/pc/products/${industryCode}/timeline`, {
       params: {
         months_back: monthsBack,
-        ...(productCodes && { product_codes: productCodes }),
+        ...(productCodes && { product_codes: productCodes.join(',') }),
       },
     }),
 
