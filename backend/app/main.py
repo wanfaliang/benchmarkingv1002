@@ -40,6 +40,7 @@ from .api.research import bea_explorer as bea_research
 from .api.research import fred_calendar as fred_calendar_research
 from .api.research.market_indices import start_polling, get_market_status
 from .config import settings
+from .core.cache.client import get_redis_client, get_cache_stats
 
 import logging
 import sys
@@ -169,6 +170,79 @@ def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
 
+
+@app.get("/health/cache")
+def cache_health_check():
+    """Cache health check endpoint - returns Redis connection status and stats"""
+    stats = get_cache_stats()
+    return {
+        "cache": stats,
+        "config": {
+            "enabled": settings.CACHE_ENABLED,
+            "host": settings.REDIS_HOST,
+            "port": settings.REDIS_PORT,
+        }
+    }
+
+
+@app.delete("/cache", tags=["Admin"])
+def clear_data_cache(username: str = Depends(get_current_username)):
+    """Clear all data cache (keeps auth cache intact). Admin only."""
+    client = get_redis_client()
+    if not client:
+        raise HTTPException(status_code=503, detail="Cache not available")
+
+    prefix = settings.CACHE_PREFIX
+    auth_prefix = f"{prefix}:auth:"
+
+    deleted = 0
+    for key in client.scan_iter(f"{prefix}:*"):
+        key_str = key if isinstance(key, str) else key.decode()
+        if not key_str.startswith(auth_prefix):
+            client.delete(key)
+            deleted += 1
+
+    return {"deleted": deleted}
+
+
+@app.delete("/cache/webhook", tags=["Webhook"])
+def cache_webhook(
+    source: str = None,
+    x_webhook_key: str = None
+):
+    """
+    Webhook for DATA project to clear cache after data updates.
+
+    - source: Optional, e.g. "bls", "fred", "treasury" to clear specific cache
+    - x_webhook_key: Secret key (pass as query param or header)
+    """
+    # Check secret key
+    if x_webhook_key != settings.CACHE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid webhook key")
+
+    client = get_redis_client()
+    if not client:
+        raise HTTPException(status_code=503, detail="Cache not available")
+
+    prefix = settings.CACHE_PREFIX
+    auth_prefix = f"{prefix}:auth:"
+
+    # Determine pattern based on source
+    if source:
+        search_pattern = f"{prefix}:{source}:*"
+    else:
+        search_pattern = f"{prefix}:*"
+
+    deleted = 0
+    for key in client.scan_iter(search_pattern):
+        key_str = key if isinstance(key, str) else key.decode()
+        if not key_str.startswith(auth_prefix):
+            client.delete(key)
+            deleted += 1
+
+    return {"deleted": deleted, "source": source or "all"}
+
+
 # Debug endpoint to verify WebSocket route is registered
 @app.get("/debug/routes")
 def list_routes():
@@ -209,12 +283,22 @@ async def generic_handler(request: Request, exc: Exception):
 # Startup event to initialize yfinance polling for real-time market data
 @app.on_event("startup")
 async def startup_event():
-    """Start yfinance polling for real-time index prices."""
+    """Initialize services on startup."""
+    # Initialize Redis cache connection
+    try:
+        redis = get_redis_client()
+        if redis:
+            logger.info("Redis cache connected successfully")
+        else:
+            logger.warning("Redis cache not available - running without cache")
+    except Exception as e:
+        logger.warning(f"Redis cache initialization failed: {e}")
+
+    # Start yfinance polling for real-time index prices
     try:
         market_status = get_market_status()
         logger.info(f"Market status: {market_status}")
 
-        # Start yfinance polling background task
         await start_polling()
         logger.info("yfinance polling started for real-time index prices")
     except Exception as e:

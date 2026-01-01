@@ -8,6 +8,7 @@ from sqlalchemy import func, and_
 
 from ....database import get_data_db
 from ....api.auth import get_current_user
+from ....core.cache import cached, DataCategory
 from .ce_schemas import (
     CEDimensions, CEIndustryItem, CESupersectorItem, CEDataTypeItem,
     CESeriesListResponse, CESeriesInfo,
@@ -319,6 +320,7 @@ def calculate_changes(data_points: List[CEData]) -> Dict:
 # ==================== Overview Endpoints ====================
 
 @router.get("/overview", response_model=CEOverviewResponse)
+@cached("bls:ce:overview", category=DataCategory.BLS_MONTHLY)
 def get_ce_overview(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_data_db)

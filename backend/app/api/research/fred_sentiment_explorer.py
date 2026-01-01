@@ -4,7 +4,6 @@ FRED Consumer Sentiment Explorer API
 Provides endpoints for analyzing consumer sentiment data:
 - UMCSENT: University of Michigan Consumer Sentiment Index
 - UMCSENT1: Consumer Sentiment - Current Conditions
-- UMCSENT5: Consumer Sentiment - Expectations
 - MICH: University of Michigan Inflation Expectations
 """
 from typing import List, Optional, Dict, Any
@@ -34,13 +33,6 @@ SENTIMENT_SERIES = {
     "UMCSENT1": {
         "name": "Current Conditions",
         "description": "University of Michigan: Consumer Sentiment - Current Conditions",
-        "frequency": "Monthly",
-        "unit": "Index 1966:Q1=100",
-        "category": "component",
-    },
-    "UMCSENT5": {
-        "name": "Expectations",
-        "description": "University of Michigan: Consumer Sentiment - Expectations",
         "frequency": "Monthly",
         "unit": "Index 1966:Q1=100",
         "category": "component",
@@ -221,7 +213,6 @@ async def get_sentiment_overview(
         },
         "components": {
             "current_conditions": results.get("umcsent1"),
-            "expectations": results.get("umcsent5"),
         },
         "inflation_expectations": results.get("mich"),
         "historical_stats": stats,
@@ -246,18 +237,16 @@ async def get_sentiment_timeline(
     # Get history for all main series
     umcsent_history = get_series_history(db, "UMCSENT", months_back=months_back)
     umcsent1_history = get_series_history(db, "UMCSENT1", months_back=months_back)
-    umcsent5_history = get_series_history(db, "UMCSENT5", months_back=months_back)
     mich_history = get_series_history(db, "MICH", months_back=months_back)
 
     # Build unified timeline
     all_dates = set()
-    for series in [umcsent_history, umcsent1_history, umcsent5_history, mich_history]:
+    for series in [umcsent_history, umcsent1_history, mich_history]:
         for obs in series:
             all_dates.add(obs["date"])
 
     umcsent_lookup = {obs["date"]: obs["value"] for obs in umcsent_history}
     umcsent1_lookup = {obs["date"]: obs["value"] for obs in umcsent1_history}
-    umcsent5_lookup = {obs["date"]: obs["value"] for obs in umcsent5_history}
     mich_lookup = {obs["date"]: obs["value"] for obs in mich_history}
 
     timeline = []
@@ -266,7 +255,6 @@ async def get_sentiment_timeline(
             "date": dt,
             "sentiment": umcsent_lookup.get(dt),
             "current_conditions": umcsent1_lookup.get(dt),
-            "expectations": umcsent5_lookup.get(dt),
             "inflation_expectations": mich_lookup.get(dt),
         })
 
@@ -404,53 +392,3 @@ async def get_series_detail(
     }
 
 
-@router.get("/correlation")
-async def get_correlation_analysis(
-    months_back: int = Query(120, ge=12, le=600, description="Months for correlation analysis"),
-    db: Session = Depends(get_data_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Analyze correlation between current conditions and expectations components.
-
-    Shows how consumer assessment of present vs future diverges or converges.
-    """
-    current_history = get_series_history(db, "UMCSENT1", months_back=months_back)
-    expect_history = get_series_history(db, "UMCSENT5", months_back=months_back)
-
-    current_lookup = {obs["date"]: obs["value"] for obs in current_history}
-    expect_lookup = {obs["date"]: obs["value"] for obs in expect_history}
-
-    # Find common dates
-    common_dates = set(current_lookup.keys()) & set(expect_lookup.keys())
-
-    analysis = []
-    for dt in sorted(common_dates):
-        current_val = current_lookup[dt]
-        expect_val = expect_lookup[dt]
-        if current_val and expect_val:
-            gap = current_val - expect_val
-            analysis.append({
-                "date": dt,
-                "current_conditions": current_val,
-                "expectations": expect_val,
-                "gap": round(gap, 1),  # Positive = more optimistic about present
-            })
-
-    # Calculate gap statistics
-    gaps = [a["gap"] for a in analysis]
-    gap_stats = {}
-    if gaps:
-        gap_stats = {
-            "current_gap": gaps[-1] if gaps else None,
-            "avg_gap": round(sum(gaps) / len(gaps), 1),
-            "max_gap": max(gaps),
-            "min_gap": min(gaps),
-        }
-
-    return {
-        "months_back": months_back,
-        "data_points": len(analysis),
-        "gap_stats": gap_stats,
-        "analysis": analysis,
-    }

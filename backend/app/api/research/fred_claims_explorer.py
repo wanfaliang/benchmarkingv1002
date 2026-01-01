@@ -17,6 +17,7 @@ from backend.app.data_models import (
 )
 from backend.app.core.deps import get_current_user
 from backend.app.models.user import User
+from backend.app.core.cache import cached, DataCategory
 
 router = APIRouter(prefix="/api/research/fred/claims", tags=["FRED Claims"])
 
@@ -181,6 +182,7 @@ def get_latest_with_changes(
 
 
 @router.get("/overview")
+@cached("fred:claims:overview", category=DataCategory.CLAIMS_WEEKLY)
 async def get_claims_overview(
     db: Session = Depends(get_data_db),
     current_user: User = Depends(get_current_user)

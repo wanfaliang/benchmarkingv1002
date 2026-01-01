@@ -22,6 +22,7 @@ from backend.app.data_models import (
 )
 from backend.app.core.deps import get_current_user
 from backend.app.models.user import User
+from backend.app.core.cache import cached, DataCategory
 
 router = APIRouter(prefix="/api/research/fred/fedfunds", tags=["FRED Fed Funds"])
 
@@ -133,6 +134,88 @@ def get_series_history(
     ]
 
 
+def get_multiple_series_history_batch(
+    db: Session,
+    series_ids: List[str],
+    days_back: int = 365,
+    prefer_alfred: bool = True,
+    sample_every_n: int = 1,
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Fetch multiple series in a SINGLE database query for better performance.
+
+    Args:
+        series_ids: List of series IDs to fetch
+        days_back: Number of days of history
+        prefer_alfred: Whether to prefer realtime (ALFRED) data
+        sample_every_n: Sample every Nth row (1 = all rows, 2 = every other row, etc.)
+
+    Returns:
+        Dictionary mapping series_id -> list of observations
+    """
+    start_date = date.today() - timedelta(days=days_back)
+    result = {sid: [] for sid in series_ids}
+
+    if prefer_alfred:
+        # Single query for all series using IN clause
+        query = db.query(FredObservationRealtime).filter(
+            FredObservationRealtime.series_id.in_(series_ids),
+            FredObservationRealtime.date >= start_date,
+        ).order_by(
+            FredObservationRealtime.series_id,
+            FredObservationRealtime.date
+        )
+
+        obs_list = query.all()
+
+        if obs_list:
+            # Group by series_id and apply sampling
+            for series_id in series_ids:
+                series_obs = [o for o in obs_list if o.series_id == series_id and o.value is not None]
+                if sample_every_n > 1:
+                    # Sample every Nth observation
+                    series_obs = series_obs[::sample_every_n]
+                    # Always include last point
+                    all_series_obs = [o for o in obs_list if o.series_id == series_id and o.value is not None]
+                    if all_series_obs and (not series_obs or series_obs[-1] != all_series_obs[-1]):
+                        series_obs.append(all_series_obs[-1])
+                result[series_id] = [
+                    {"date": o.date.isoformat(), "value": o.value}
+                    for o in series_obs
+                ]
+
+            # Check if we got data for all series
+            if all(result[sid] for sid in series_ids):
+                return result
+
+    # Fall back to Latest for any missing series
+    missing_series = [sid for sid in series_ids if not result[sid]]
+    if missing_series:
+        query = db.query(FredObservationLatest).filter(
+            FredObservationLatest.series_id.in_(missing_series),
+            FredObservationLatest.date >= start_date,
+        ).order_by(
+            FredObservationLatest.series_id,
+            FredObservationLatest.date
+        )
+
+        obs_list = query.all()
+
+        for series_id in missing_series:
+            series_obs = [o for o in obs_list if o.series_id == series_id and o.value is not None]
+            if sample_every_n > 1:
+                all_series_obs = series_obs.copy()
+                series_obs = series_obs[::sample_every_n]
+                if all_series_obs and (not series_obs or series_obs[-1] != all_series_obs[-1]):
+                    series_obs.append(all_series_obs[-1])
+            result[series_id] = [
+                {"date": o.date.isoformat(), "value": o.value}
+                for o in series_obs
+            ]
+
+    return result
+
+
 def get_latest_value(
     db: Session,
     series_id: str,
@@ -192,6 +275,7 @@ def find_rate_changes(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 @router.get("/overview")
+@cached("fred:fedfunds:overview", category=DataCategory.FRED_SERIES)
 async def get_fedfunds_overview(
     db: Session = Depends(get_data_db),
     current_user: User = Depends(get_current_user)
@@ -279,24 +363,12 @@ def sample_timeline(timeline: List[Dict[str, Any]], max_points: int = 500) -> Li
     return sampled
 
 
-@router.get("/timeline")
-async def get_fedfunds_timeline(
-    years_back: int = Query(5, ge=1, le=50, description="Years of history"),
-    db: Session = Depends(get_data_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Get historical timeline for Fed Funds rates.
-
-    Returns sampled data for chart display (max ~500 points).
-    """
-    days_back = years_back * 365
-
-    lower_history = get_series_history(db, "DFEDTARL", days_back=days_back)
-    upper_history = get_series_history(db, "DFEDTARU", days_back=days_back)
-    effective_history = get_series_history(db, "DFF", days_back=days_back)
-
-    # Build unified timeline
+def build_unified_timeline(
+    lower_history: List[Dict[str, Any]],
+    upper_history: List[Dict[str, Any]],
+    effective_history: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Build unified timeline from three series histories."""
     all_dates = set()
     for obs in lower_history:
         all_dates.add(obs["date"])
@@ -321,6 +393,81 @@ async def get_fedfunds_timeline(
             "effective": effective_lookup.get(dt),
         })
 
+    return timeline
+
+
+def build_comparison_data(
+    lower_history: List[Dict[str, Any]],
+    upper_history: List[Dict[str, Any]],
+    effective_history: List[Dict[str, Any]],
+) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Build comparison data and tracking stats from three series histories."""
+    lower_lookup = {obs["date"]: obs["value"] for obs in lower_history}
+    upper_lookup = {obs["date"]: obs["value"] for obs in upper_history}
+    effective_lookup = {obs["date"]: obs["value"] for obs in effective_history}
+
+    common_dates = set(lower_lookup.keys()) & set(upper_lookup.keys()) & set(effective_lookup.keys())
+
+    comparison = []
+    deviations = []
+
+    for dt in sorted(common_dates):
+        lower_val = lower_lookup[dt]
+        upper_val = upper_lookup[dt]
+        effective_val = effective_lookup[dt]
+        midpoint = (lower_val + upper_val) / 2
+        deviation = effective_val - midpoint
+
+        comparison.append({
+            "date": dt,
+            "target_lower": lower_val,
+            "target_upper": upper_val,
+            "target_midpoint": round(midpoint, 3),
+            "effective": effective_val,
+            "deviation_bps": round(deviation * 100, 1),
+        })
+        deviations.append(abs(deviation))
+
+    tracking_stats = {}
+    if deviations:
+        tracking_stats = {
+            "avg_deviation_bps": round(sum(deviations) / len(deviations) * 100, 2),
+            "max_deviation_bps": round(max(deviations) * 100, 2),
+            "within_5bps_pct": round(sum(1 for d in deviations if d <= 0.05) / len(deviations) * 100, 1),
+        }
+
+    return comparison, tracking_stats
+
+
+@router.get("/timeline")
+@cached("fred:fedfunds:timeline", category=DataCategory.FRED_SERIES, param_keys=["years_back"])
+async def get_fedfunds_timeline(
+    years_back: int = Query(5, ge=1, le=50, description="Years of history"),
+    db: Session = Depends(get_data_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get historical timeline for Fed Funds rates.
+
+    Returns sampled data for chart display (max ~500 points).
+    Uses optimized batch query to fetch all 3 series in one DB call.
+    """
+    days_back = years_back * 365
+
+    # OPTIMIZED: Single DB query for all 3 series
+    batch_data = get_multiple_series_history_batch(
+        db,
+        ["DFEDTARL", "DFEDTARU", "DFF"],
+        days_back=days_back,
+    )
+
+    lower_history = batch_data["DFEDTARL"]
+    upper_history = batch_data["DFEDTARU"]
+    effective_history = batch_data["DFF"]
+
+    # Build unified timeline
+    timeline = build_unified_timeline(lower_history, upper_history, effective_history)
+
     # Sample for chart display
     sampled_timeline = sample_timeline(timeline, max_points=500)
 
@@ -333,6 +480,7 @@ async def get_fedfunds_timeline(
 
 
 @router.get("/changes")
+@cached("fred:fedfunds:changes", category=DataCategory.FRED_SERIES, param_keys=["years_back"])
 async def get_rate_changes(
     years_back: int = Query(5, ge=1, le=50, description="Years of history for changes"),
     db: Session = Depends(get_data_db),
@@ -379,6 +527,7 @@ async def get_rate_changes(
 
 
 @router.get("/series/{series_id}")
+@cached("fred:fedfunds:series", category=DataCategory.FRED_SERIES, param_keys=["series_id", "days_back"])
 async def get_series_detail(
     series_id: str,
     days_back: int = Query(365, ge=1, le=18250, description="Days of history"),
@@ -439,6 +588,7 @@ async def get_series_detail(
 
 
 @router.get("/compare-effective")
+@cached("fred:fedfunds:compare", category=DataCategory.FRED_SERIES, param_keys=["days_back"])
 async def compare_effective_to_target(
     days_back: int = Query(365, ge=1, le=3650, description="Days of history"),
     db: Session = Depends(get_data_db),
@@ -448,46 +598,21 @@ async def compare_effective_to_target(
     Compare effective rate to target range.
 
     Shows how closely the effective rate tracks the target midpoint.
+    Uses optimized batch query to fetch all 3 series in one DB call.
     """
-    lower_history = get_series_history(db, "DFEDTARL", days_back=days_back)
-    upper_history = get_series_history(db, "DFEDTARU", days_back=days_back)
-    effective_history = get_series_history(db, "DFF", days_back=days_back)
+    # OPTIMIZED: Single DB query for all 3 series
+    batch_data = get_multiple_series_history_batch(
+        db,
+        ["DFEDTARL", "DFEDTARU", "DFF"],
+        days_back=days_back,
+    )
 
-    lower_lookup = {obs["date"]: obs["value"] for obs in lower_history}
-    upper_lookup = {obs["date"]: obs["value"] for obs in upper_history}
-    effective_lookup = {obs["date"]: obs["value"] for obs in effective_history}
+    lower_history = batch_data["DFEDTARL"]
+    upper_history = batch_data["DFEDTARU"]
+    effective_history = batch_data["DFF"]
 
-    # Find common dates
-    common_dates = set(lower_lookup.keys()) & set(upper_lookup.keys()) & set(effective_lookup.keys())
-
-    comparison = []
-    deviations = []
-
-    for dt in sorted(common_dates):
-        lower_val = lower_lookup[dt]
-        upper_val = upper_lookup[dt]
-        effective_val = effective_lookup[dt]
-        midpoint = (lower_val + upper_val) / 2
-        deviation = effective_val - midpoint
-
-        comparison.append({
-            "date": dt,
-            "target_lower": lower_val,
-            "target_upper": upper_val,
-            "target_midpoint": round(midpoint, 3),
-            "effective": effective_val,
-            "deviation_bps": round(deviation * 100, 1),
-        })
-        deviations.append(abs(deviation))
-
-    # Stats on how well effective tracks target
-    tracking_stats = {}
-    if deviations:
-        tracking_stats = {
-            "avg_deviation_bps": round(sum(deviations) / len(deviations) * 100, 2),
-            "max_deviation_bps": round(max(deviations) * 100, 2),
-            "within_5bps_pct": round(sum(1 for d in deviations if d <= 0.05) / len(deviations) * 100, 1),
-        }
+    # Build comparison data using shared function
+    comparison, tracking_stats = build_comparison_data(lower_history, upper_history, effective_history)
 
     # Sample for chart display
     sampled_comparison = sample_timeline(comparison, max_points=500)
@@ -501,7 +626,87 @@ async def compare_effective_to_target(
     }
 
 
+@router.get("/chart-data")
+@cached("fred:fedfunds:chart-data", category=DataCategory.FRED_SERIES, param_keys=["years_back"])
+async def get_combined_chart_data(
+    years_back: int = Query(5, ge=1, le=50, description="Years of history"),
+    db: Session = Depends(get_data_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    OPTIMIZED: Get all chart data (timeline + comparison + changes) in ONE request.
+
+    This endpoint replaces the need to call /timeline, /compare-effective, and /changes
+    separately. Instead of 6-9 separate DB queries, this makes just 1 query.
+
+    Returns:
+        - timeline: Rate history for the timeline chart
+        - comparison: Effective vs target comparison data
+        - changes: FOMC rate decisions
+    """
+    days_back = years_back * 365
+
+    # SINGLE DB query for all 3 series
+    batch_data = get_multiple_series_history_batch(
+        db,
+        ["DFEDTARL", "DFEDTARU", "DFF"],
+        days_back=days_back,
+    )
+
+    lower_history = batch_data["DFEDTARL"]
+    upper_history = batch_data["DFEDTARU"]
+    effective_history = batch_data["DFF"]
+
+    # Build timeline (for Rate History chart)
+    timeline = build_unified_timeline(lower_history, upper_history, effective_history)
+    sampled_timeline = sample_timeline(timeline, max_points=500)
+
+    # Build comparison (for Effective vs Target chart)
+    comparison, tracking_stats = build_comparison_data(lower_history, upper_history, effective_history)
+    sampled_comparison = sample_timeline(comparison, max_points=500)
+
+    # Calculate rate changes (for FOMC Decisions table)
+    rate_changes = find_rate_changes(upper_history)
+    rate_changes_reversed = list(reversed(rate_changes))
+
+    # Summary stats by year
+    by_year = {}
+    cumulative = 0
+    for change in rate_changes:
+        cumulative += change["change_bps"]
+        change["cumulative_bps"] = cumulative
+        year = change["date"][:4]
+        if year not in by_year:
+            by_year[year] = {"hikes": 0, "cuts": 0, "net_bps": 0}
+        if change["direction"] == "hike":
+            by_year[year]["hikes"] += 1
+        else:
+            by_year[year]["cuts"] += 1
+        by_year[year]["net_bps"] += change["change_bps"]
+
+    return {
+        "years_back": years_back,
+        "timeline": {
+            "data_points": len(sampled_timeline),
+            "total_points": len(timeline),
+            "data": sampled_timeline,
+        },
+        "comparison": {
+            "data_points": len(sampled_comparison),
+            "total_points": len(comparison),
+            "tracking_stats": tracking_stats,
+            "data": sampled_comparison,
+        },
+        "changes": {
+            "total_changes": len(rate_changes),
+            "data": rate_changes_reversed,
+            "by_year": by_year,
+        },
+    }
+
+
 @router.get("/sibling-series")
+@cached("fred:fedfunds:siblings", category=DataCategory.METADATA)
 async def get_sibling_series(
     db: Session = Depends(get_data_db),
     current_user: User = Depends(get_current_user)
@@ -558,6 +763,7 @@ async def get_sibling_series(
 
 
 @router.get("/historical-table")
+@cached("fred:fedfunds:table", category=DataCategory.FRED_SERIES, param_keys=["years_back", "frequency", "limit"])
 async def get_historical_table(
     years_back: int = Query(5, ge=0, le=100, description="Years of history (0 = all)"),
     frequency: str = Query("monthly", description="monthly or daily"),
@@ -661,6 +867,7 @@ async def get_historical_table(
 
 
 @router.get("/about")
+@cached("fred:fedfunds:about", category=DataCategory.METADATA)
 async def get_about_info(
     db: Session = Depends(get_data_db),
     current_user: User = Depends(get_current_user)

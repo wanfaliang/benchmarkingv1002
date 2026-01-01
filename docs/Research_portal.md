@@ -49,7 +49,7 @@ The Macro Impact Lab portal consists of:
 Each portal section follows the structure:
 - (1) Header  
 - (2) Snapshot Cards  
-- (3) Calendar / Update Feed  
+- (3) Calendar / Update Feed  4
 - (4) Latest Releases  
 - (5) Category Browser  
 - (6) Quick Studies  

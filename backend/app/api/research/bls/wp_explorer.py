@@ -16,6 +16,7 @@ from typing import Optional, List
 
 from ....database import get_data_db
 from ....api.auth import get_current_user
+from ....core.cache import cached, DataCategory
 from .wp_schemas import (
     WPDimensions, WPGroupItem, WPItemInfo,
     WPSeriesInfo, WPSeriesListResponse,
@@ -430,6 +431,7 @@ def get_items_for_group(
 # ==================== Final Demand Overview (Headline PPI) ====================
 
 @router.get("/overview", response_model=WPFinalDemandOverview)
+@cached("bls:wp:overview", category=DataCategory.BLS_MONTHLY)
 def get_overview(
     db: Session = Depends(get_data_db),
     current_user=Depends(get_current_user)

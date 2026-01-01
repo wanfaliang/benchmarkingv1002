@@ -9,6 +9,7 @@ from sqlalchemy import and_
 
 from ....database import get_data_db
 from ....api.auth import get_current_user
+from ....core.cache import cached, DataCategory
 from .ln_schemas import (
     LNDimensions,
     LNDimensionItem,
@@ -309,11 +310,12 @@ def get_series_data(
 
 
 @router.get("/overview", response_model=LNOverviewResponse)
+@cached("bls:ln:overview", category=DataCategory.BLS_MONTHLY)
 def get_overview(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_data_db)
 ):
-    """Get overview dashboard with headline unemployment metrics"""
+    """Get overview dashboard with headline unemployment metrics (cached 24h)"""
 
     # Headline unemployment rate (seasonally adjusted, all persons 16+)
     headline_series_id = "LNS14000000"

@@ -49,7 +49,6 @@ interface OverviewData {
   headline: SeriesData & { sentiment_level: string | null };
   components: {
     current_conditions: SeriesData | null;
-    expectations: SeriesData | null;
   };
   inflation_expectations: SeriesData | null;
   historical_stats: {
@@ -69,7 +68,6 @@ interface TimelinePoint {
   date: string;
   sentiment: number | null;
   current_conditions: number | null;
-  expectations: number | null;
   inflation_expectations: number | null;
 }
 
@@ -94,7 +92,6 @@ const PERIOD_OPTIONS = [
 const CHART_COLORS = {
   sentiment: '#6366f1',
   current: '#10b981',
-  expectations: '#f59e0b',
   inflation: '#ef4444',
 };
 
@@ -267,31 +264,7 @@ function ComponentsCard({ data }: { data: OverviewData }) {
           series={components.current_conditions}
           color={CHART_COLORS.current}
         />
-        <ComponentRow
-          label="Expectations"
-          series={components.expectations}
-          color={CHART_COLORS.expectations}
-        />
       </div>
-
-      {/* Component Gap */}
-      {components.current_conditions && components.expectations && (
-        <div className="mt-4 pt-4 border-t">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Current vs Expectations Gap</span>
-            <span className={`font-semibold ${
-              (components.current_conditions.value - components.expectations.value) >= 0
-                ? 'text-green-600'
-                : 'text-red-600'
-            }`}>
-              {formatChange(components.current_conditions.value - components.expectations.value)}
-            </span>
-          </div>
-          <div className="text-xs text-gray-400 mt-1">
-            Positive = More optimistic about present than future
-          </div>
-        </div>
-      )}
 
       {/* Inflation Expectations */}
       {inflation_expectations && (
@@ -398,15 +371,6 @@ function SentimentTimelineChart({ monthsBack }: { monthsBack: number }) {
               dot={false}
               name="Current Conditions"
               strokeDasharray="5 5"
-            />
-            <Line
-              type="monotone"
-              dataKey="expectations"
-              stroke={CHART_COLORS.expectations}
-              strokeWidth={1.5}
-              dot={false}
-              name="Expectations"
-              strokeDasharray="3 3"
             />
           </ComposedChart>
         </ResponsiveContainer>

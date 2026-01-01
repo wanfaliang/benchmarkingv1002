@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { claimsResearchAPI } from '../services/api';
 import FREDExplorerNav from '../components/FREDExplorerNav';
 import {
@@ -99,6 +99,39 @@ interface TimelineData {
   timeline: TimelinePoint[];
 }
 
+interface StateTimelinePoint {
+  date: string;
+  iclaims: number | null;
+  cclaims: number | null;
+}
+
+interface StateDetailsData {
+  state_code: string;
+  state_name: string;
+  iclaims: {
+    series_id: string;
+    latest: {
+      value: number;
+      date: string;
+      wow_change: number | null;
+      wow_pct: number | null;
+    } | null;
+    statistics: {
+      min: number;
+      max: number;
+      avg: number;
+    };
+  };
+  cclaims: {
+    series_id: string;
+    latest: {
+      value: number;
+      date: string;
+    } | null;
+  };
+  timeline: StateTimelinePoint[];
+}
+
 interface CompareData {
   current: {
     value: number;
@@ -138,6 +171,28 @@ const PERIOD_OPTIONS = [
   { label: '5Y', value: 260 },
   { label: '10Y', value: 520 },
   { label: 'All', value: 2600 },
+];
+
+const STATE_OPTIONS: { code: string; name: string }[] = [
+  { code: '', name: 'National' },
+  { code: 'AK', name: 'Alaska' }, { code: 'AL', name: 'Alabama' }, { code: 'AR', name: 'Arkansas' },
+  { code: 'AZ', name: 'Arizona' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' }, { code: 'DC', name: 'District of Columbia' }, { code: 'DE', name: 'Delaware' },
+  { code: 'FL', name: 'Florida' }, { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' },
+  { code: 'IA', name: 'Iowa' }, { code: 'ID', name: 'Idaho' }, { code: 'IL', name: 'Illinois' },
+  { code: 'IN', name: 'Indiana' }, { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' }, { code: 'MA', name: 'Massachusetts' }, { code: 'MD', name: 'Maryland' },
+  { code: 'ME', name: 'Maine' }, { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' },
+  { code: 'MO', name: 'Missouri' }, { code: 'MS', name: 'Mississippi' }, { code: 'MT', name: 'Montana' },
+  { code: 'NC', name: 'North Carolina' }, { code: 'ND', name: 'North Dakota' }, { code: 'NE', name: 'Nebraska' },
+  { code: 'NH', name: 'New Hampshire' }, { code: 'NJ', name: 'New Jersey' }, { code: 'NM', name: 'New Mexico' },
+  { code: 'NV', name: 'Nevada' }, { code: 'NY', name: 'New York' }, { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' }, { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' },
+  { code: 'PR', name: 'Puerto Rico' }, { code: 'RI', name: 'Rhode Island' }, { code: 'SC', name: 'South Carolina' },
+  { code: 'SD', name: 'South Dakota' }, { code: 'TN', name: 'Tennessee' }, { code: 'TX', name: 'Texas' },
+  { code: 'UT', name: 'Utah' }, { code: 'VA', name: 'Virginia' }, { code: 'VI', name: 'Virgin Islands' },
+  { code: 'VT', name: 'Vermont' }, { code: 'WA', name: 'Washington' }, { code: 'WI', name: 'Wisconsin' },
+  { code: 'WV', name: 'West Virginia' }, { code: 'WY', name: 'Wyoming' },
 ];
 
 const CHART_COLORS = {
@@ -447,11 +502,29 @@ interface HistoricalTrendsSectionProps {
   onWeeksChange: (w: number) => void;
 }
 
+interface ChartDataPoint {
+  date: string;
+  dateDisplay?: string;
+  national: number | null;
+  ic4wsa: number | null;
+  ccsa: number | null;
+  [key: string]: string | number | null | undefined;
+}
+
+// Generate distinct colors for state lines
+const STATE_COLORS = [
+  '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4',
+  '#3b82f6', '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#84cc16',
+];
+
 function HistoricalTrendsSection({ weeksBack, onWeeksChange }: HistoricalTrendsSectionProps) {
   const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
   const [showCCSA, setShowCCSA] = useState(false);
+  const [selectedStates, setSelectedStates] = useState<string[]>([]);
+  const [stateFilter, setStateFilter] = useState('');
 
-  const { data: timeline, isLoading } = useQuery({
+  // National data query (always fetch)
+  const { data: nationalTimeline, isLoading: nationalLoading } = useQuery({
     queryKey: ['claims-timeline', weeksBack],
     queryFn: async () => {
       const res = await claimsResearchAPI.getTimeline<TimelineData>(weeksBack);
@@ -460,27 +533,80 @@ function HistoricalTrendsSection({ weeksBack, onWeeksChange }: HistoricalTrendsS
     staleTime: 5 * 60 * 1000,
   });
 
-  const chartData = useMemo(() => {
-    if (!timeline?.timeline) return [];
-    return timeline.timeline.map(t => ({
-      date: formatShortDate(t.date),
-      fullDate: t.date,
-      icsa: t.icsa,
-      ic4wsa: t.ic4wsa,
-      ccsa: t.ccsa ? t.ccsa / 1000 : null, // Scale down for dual axis
-    }));
-  }, [timeline]);
+  // State data queries (fetch for each selected state)
+  const stateQueries = useQueries({
+    queries: selectedStates.map(stateCode => ({
+      queryKey: ['claims-state-details', stateCode, weeksBack],
+      queryFn: async () => {
+        const res = await claimsResearchAPI.getStateDetails<StateDetailsData>(stateCode, weeksBack);
+        return res.data;
+      },
+      staleTime: 5 * 60 * 1000,
+    })),
+  });
+
+  const isLoading = nationalLoading || stateQueries.some(q => q.isLoading);
+
+  // Build combined chart data with national + selected states
+  const chartData = useMemo((): ChartDataPoint[] => {
+    if (!nationalTimeline?.timeline) return [];
+
+    // Start with national data
+    const dataMap: Record<string, ChartDataPoint> = {};
+
+    nationalTimeline.timeline.forEach(t => {
+      dataMap[t.date] = {
+        date: t.date,
+        national: t.icsa,
+        ic4wsa: t.ic4wsa,
+        ccsa: t.ccsa ? t.ccsa / 1000 : null,
+      };
+    });
+
+    // Add each selected state's data
+    stateQueries.forEach((query, idx) => {
+      const stateCode = selectedStates[idx];
+      if (query.data?.timeline) {
+        query.data.timeline.forEach(t => {
+          if (!dataMap[t.date]) {
+            dataMap[t.date] = { date: t.date, national: null, ic4wsa: null, ccsa: null };
+          }
+          dataMap[t.date][stateCode] = t.iclaims;
+        });
+      }
+    });
+
+    return Object.values(dataMap)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(d => ({
+        ...d,
+        dateDisplay: formatShortDate(d.date),
+      }));
+  }, [nationalTimeline, stateQueries, selectedStates]);
 
   // Calculate average for reference line
-  const icsaAvg = useMemo(() => {
-    const values = chartData.map(d => d.icsa).filter((v): v is number => v !== null);
+  const nationalAvg = useMemo(() => {
+    const values = chartData.map(d => d.national as number).filter((v): v is number => v !== null);
     return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null;
   }, [chartData]);
+
+  const toggleState = (stateCode: string) => {
+    setSelectedStates(prev =>
+      prev.includes(stateCode)
+        ? prev.filter(s => s !== stateCode)
+        : prev.length < 10 ? [...prev, stateCode] : prev
+    );
+  };
+
+  const filteredStates = useMemo(() =>
+    STATE_OPTIONS.filter(s =>
+      s.code && (s.name.toLowerCase().includes(stateFilter.toLowerCase()) || s.code.toLowerCase().includes(stateFilter.toLowerCase()))
+    ), [stateFilter]);
 
   return (
     <SectionCard
       title="Historical Trends"
-      description="Weekly claims data over time"
+      description={`Weekly claims data • National${selectedStates.length > 0 ? ` + ${selectedStates.length} state${selectedStates.length > 1 ? 's' : ''}` : ''}`}
       color="blue"
       icon={BarChart3}
       rightContent={
@@ -492,149 +618,220 @@ function HistoricalTrendsSection({ weeksBack, onWeeksChange }: HistoricalTrendsS
               onChange={(e) => setShowCCSA(e.target.checked)}
               className="rounded text-blue-600"
             />
-            Show CCSA
+            CCSA
           </label>
           <PeriodSelector value={weeksBack} onChange={onWeeksChange} color={SECTION_COLORS.blue.main} />
           <ViewToggle value={viewMode} onChange={setViewMode} />
         </div>
       }
     >
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      <div className="flex gap-4">
+        {/* State selector list - left side */}
+        <div className="w-48 flex-shrink-0 border-r pr-4">
+          <input
+            type="text"
+            placeholder="Filter states..."
+            value={stateFilter}
+            onChange={(e) => setStateFilter(e.target.value)}
+            className="w-full text-xs border rounded px-2 py-1 mb-2"
+          />
+          <div className="overflow-y-auto max-h-[28rem] space-y-0.5">
+            {filteredStates.map((state) => {
+              const isSelected = selectedStates.includes(state.code);
+              const colorIdx = selectedStates.indexOf(state.code);
+              return (
+                <label
+                  key={state.code}
+                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs hover:bg-gray-100 ${isSelected ? 'bg-blue-50' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleState(state.code)}
+                    className="rounded text-blue-600"
+                  />
+                  {isSelected && (
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: STATE_COLORS[colorIdx % STATE_COLORS.length] }} />
+                  )}
+                  <span className="text-gray-500 w-6">{state.code}</span>
+                  <span className="truncate">{state.name}</span>
+                </label>
+              );
+            })}
+          </div>
+          {selectedStates.length > 0 && (
+            <button
+              onClick={() => setSelectedStates([])}
+              className="mt-2 text-xs text-blue-600 hover:underline"
+            >
+              Clear all ({selectedStates.length})
+            </button>
+          )}
         </div>
-      ) : viewMode === 'chart' ? (
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 10, right: showCCSA ? 60 : 20, left: 10, bottom: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11 }}
-                tickLine={false}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                yAxisId="left"
-                tick={{ fontSize: 11 }}
-                tickLine={false}
-                tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`}
-                domain={['auto', 'auto']}
-              />
-              {showCCSA && (
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tick={{ fontSize: 11 }}
-                  tickLine={false}
-                  tickFormatter={(v) => `${v.toFixed(0)}K`}
-                  domain={['auto', 'auto']}
-                  label={{ value: 'CCSA (K)', angle: 90, position: 'insideRight', fontSize: 10 }}
-                />
-              )}
-              <Tooltip
-                contentStyle={{ fontSize: 12, borderRadius: 8, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                formatter={(value: number, name: string) => {
-                  if (name === 'ccsa') return [`${(value * 1000).toLocaleString()}`, 'Continued Claims'];
-                  if (name === 'icsa') return [value?.toLocaleString() ?? 'N/A', 'Initial Claims'];
-                  if (name === 'ic4wsa') return [value?.toLocaleString() ?? 'N/A', '4-Week MA'];
-                  return [value, name];
-                }}
-                labelFormatter={(label) => `Week of ${label}`}
-              />
-              <Legend />
-              {icsaAvg && (
-                <ReferenceLine
-                  yAxisId="left"
-                  y={icsaAvg}
-                  stroke="#94a3b8"
-                  strokeDasharray="5 5"
-                  label={{ value: `Avg: ${formatNumber(icsaAvg)}`, fontSize: 10, fill: '#64748b' }}
-                />
-              )}
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="icsa"
-                name="Initial Claims"
-                stroke={CHART_COLORS.icsa}
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 2 }}
-              />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="ic4wsa"
-                name="4-Week MA"
-                stroke={CHART_COLORS.ic4wsa}
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={false}
-              />
-              {showCCSA && (
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="ccsa"
-                  name="Continued Claims (K)"
-                  stroke={CHART_COLORS.ccsa}
-                  strokeWidth={2}
-                  dot={false}
-                />
-              )}
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      ) : (
-        <div className="overflow-auto max-h-96">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-gray-100">
-              <tr>
-                <th className="text-left p-2 font-semibold sticky left-0 bg-gray-100 z-10">Week</th>
-                <th className="text-right p-2 font-semibold">
-                  <div className="flex items-center justify-end gap-1">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.icsa }} />
-                    Initial Claims
-                  </div>
-                </th>
-                <th className="text-right p-2 font-semibold">
-                  <div className="flex items-center justify-end gap-1">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.ic4wsa }} />
-                    4-Week MA
-                  </div>
-                </th>
-                <th className="text-right p-2 font-semibold">
-                  <div className="flex items-center justify-end gap-1">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.ccsa }} />
-                    Continued Claims
-                  </div>
-                </th>
-                <th className="text-right p-2 font-semibold">WoW Δ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {timeline?.timeline?.slice().reverse().map((row, idx, arr) => {
-                const prevRow = arr[idx + 1];
-                const wowChange = row.icsa && prevRow?.icsa ? row.icsa - prevRow.icsa : null;
-                return (
-                  <tr key={row.date} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className={`p-2 font-medium sticky left-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                      {formatShortDate(row.date)}
-                    </td>
-                    <td className="text-right p-2 font-mono">{row.icsa?.toLocaleString() ?? '--'}</td>
-                    <td className="text-right p-2 font-mono">{row.ic4wsa?.toLocaleString() ?? '--'}</td>
-                    <td className="text-right p-2 font-mono">{row.ccsa?.toLocaleString() ?? '--'}</td>
-                    <td className={`text-right p-2 font-mono font-semibold ${wowChange !== null ? (wowChange > 0 ? 'text-red-500' : 'text-emerald-500') : ''}`}>
-                      {wowChange !== null ? formatChange(wowChange) : '--'}
-                    </td>
+
+        {/* Chart/Table - right side */}
+        <div className="flex-1 min-w-0">
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+          ) : viewMode === 'chart' ? (
+            <div className="h-[28rem]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 10, right: showCCSA ? 60 : 20, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="dateDisplay"
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`}
+                    domain={['auto', 'auto']}
+                  />
+                  {showCCSA && (
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      tickFormatter={(v) => `${v.toFixed(0)}K`}
+                      domain={['auto', 'auto']}
+                      label={{ value: 'CCSA (K)', angle: 90, position: 'insideRight', fontSize: 10 }}
+                    />
+                  )}
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 8, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                    formatter={(value: number, name: string) => {
+                      if (name === 'ccsa') return [`${(value * 1000).toLocaleString()}`, 'Continued Claims'];
+                      return [value?.toLocaleString() ?? 'N/A', name];
+                    }}
+                    labelFormatter={(label) => `Week of ${label}`}
+                  />
+                  <Legend />
+                  {nationalAvg && (
+                    <ReferenceLine
+                      yAxisId="left"
+                      y={nationalAvg}
+                      stroke="#94a3b8"
+                      strokeDasharray="5 5"
+                      label={{ value: `Nat'l Avg: ${formatNumber(nationalAvg)}`, fontSize: 10, fill: '#64748b' }}
+                    />
+                  )}
+                  {/* National line */}
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="national"
+                    name="National"
+                    stroke={CHART_COLORS.icsa}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 2 }}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="ic4wsa"
+                    name="4-Week MA"
+                    stroke={CHART_COLORS.ic4wsa}
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    dot={false}
+                  />
+                  {/* State lines */}
+                  {selectedStates.map((stateCode, idx) => (
+                    <Line
+                      key={stateCode}
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey={stateCode}
+                      name={STATE_OPTIONS.find(s => s.code === stateCode)?.name || stateCode}
+                      stroke={STATE_COLORS[idx % STATE_COLORS.length]}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  ))}
+                  {showCCSA && (
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="ccsa"
+                      name="Continued Claims (K)"
+                      stroke={CHART_COLORS.ccsa}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  )}
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="overflow-auto max-h-[32rem]">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-gray-100">
+                  <tr>
+                    <th className="text-left p-2 font-semibold sticky left-0 bg-gray-100 z-10">Week</th>
+                    <th className="text-right p-2 font-semibold">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.icsa }} />
+                        National
+                      </div>
+                    </th>
+                    <th className="text-right p-2 font-semibold">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.ic4wsa }} />
+                        4-Week MA
+                      </div>
+                    </th>
+                    {selectedStates.map((stateCode, idx) => (
+                      <th key={stateCode} className="text-right p-2 font-semibold">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATE_COLORS[idx % STATE_COLORS.length] }} />
+                          {stateCode}
+                        </div>
+                      </th>
+                    ))}
+                    {showCCSA && (
+                      <th className="text-right p-2 font-semibold">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.ccsa }} />
+                          CCSA
+                        </div>
+                      </th>
+                    )}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {chartData.slice().reverse().map((row, idx) => (
+                      <tr key={row.date} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className={`p-2 font-medium sticky left-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                          {row.dateDisplay}
+                        </td>
+                        <td className="text-right p-2 font-mono">{(row.national as number)?.toLocaleString() ?? '--'}</td>
+                        <td className="text-right p-2 font-mono">{(row.ic4wsa as number)?.toLocaleString() ?? '--'}</td>
+                        {selectedStates.map(stateCode => (
+                          <td key={stateCode} className="text-right p-2 font-mono">
+                            {(row[stateCode] as number)?.toLocaleString() ?? '--'}
+                          </td>
+                        ))}
+                        {showCCSA && (
+                          <td className="text-right p-2 font-mono">
+                            {row.ccsa ? ((row.ccsa as number) * 1000).toLocaleString() : '--'}
+                          </td>
+                        )}
+                      </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </SectionCard>
   );
 }
@@ -831,13 +1028,12 @@ function StateComparisonSection() {
     });
   }, [statesData, sortField, sortDirection]);
 
-  // Top changers for the chart view
-  const topChangers = useMemo(() => {
+  // All states sorted by period change for the chart view
+  const sortedByChange = useMemo(() => {
     if (!statesData?.states) return [];
     return [...statesData.states]
       .filter(s => s.iclaims?.period_pct !== null && s.iclaims?.period_pct !== undefined)
-      .sort((a, b) => Math.abs(b.iclaims?.period_pct ?? 0) - Math.abs(a.iclaims?.period_pct ?? 0))
-      .slice(0, 15);
+      .sort((a, b) => (b.iclaims?.period_pct ?? 0) - (a.iclaims?.period_pct ?? 0));
   }, [statesData]);
 
   const handleSort = (field: SortField) => {
@@ -881,11 +1077,11 @@ function StateComparisonSection() {
           <Loader2 className="w-8 h-8 animate-spin text-green-500" />
         </div>
       ) : viewMode === 'chart' ? (
-        <div className="h-[450px]">
-          <p className="text-sm text-gray-500 mb-2 text-center">Top 15 States by {periodLabel} Change (%)</p>
-          <ResponsiveContainer width="100%" height="90%">
+        <div className="h-[1200px]">
+          <p className="text-sm text-gray-500 mb-2 text-center">All States by {periodLabel} Change (%)</p>
+          <ResponsiveContainer width="100%" height="98%">
             <BarChart
-              data={topChangers}
+              data={sortedByChange}
               layout="vertical"
               margin={{ top: 10, right: 40, left: 100, bottom: 10 }}
             >
@@ -914,7 +1110,7 @@ function StateComparisonSection() {
                 name={`${periodLabel} Change`}
                 radius={[0, 4, 4, 0]}
               >
-                {topChangers.map((entry, index) => {
+                {sortedByChange.map((entry, index) => {
                   const pct = entry.iclaims?.period_pct ?? 0;
                   return (
                     <Cell

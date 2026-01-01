@@ -45,7 +45,29 @@ class Settings(BaseSettings):
 
     RESEND_API_KEY: str
     FROM_EMAIL: str = "onboarding@resend.dev"  # Default Resend test email
-    
+
+    # Redis Configuration
+    REDIS_URL: Optional[str] = None  # Full URL overrides host/port/db
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: Optional[str] = None
+
+    # Cache Settings
+    CACHE_ENABLED: bool = True
+    CACHE_PREFIX: str = "finexus"
+
+    # Cache webhook (for DATA project to trigger cache clear)
+    CACHE_WEBHOOK_SECRET: str = "change-me-in-production"
+
+    # Cache TTLs (seconds) - session-based caching
+    CACHE_TTL_BLS: int = 900          # 15 min - session scope
+    CACHE_TTL_TREASURY: int = 900     # 15 min - session scope
+    CACHE_TTL_CLAIMS: int = 900       # 15 min - session scope
+    CACHE_TTL_FRED: int = 900         # 15 min - session scope
+    CACHE_TTL_AUTH: int = 1800        # 30 min - user auth
+    CACHE_TTL_DEFAULT: int = 900      # 15 min - fallback
+
     class Config:
         env_file = ".env"
         case_sensitive = True

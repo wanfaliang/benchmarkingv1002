@@ -15,6 +15,8 @@ from datetime import datetime, date
 
 from ...database import get_data_db
 from ...data_models.treasury_models import TreasuryDailyRate, TreasuryAuction, TreasuryUpcomingAuction
+from ...core.cache import cached, DataCategory
+print("[PORTAL_API] Cache module imported successfully")  # Debug
 
 router = APIRouter(prefix="/api/research/portal", tags=["Research Portal"])
 
@@ -213,8 +215,10 @@ class TreasuryPortalData(BaseModel):
 # ============================================================================
 
 @router.get("/bls/comprehensive", response_model=BLSPortalData)
+@cached("portal:bls:comprehensive", category=DataCategory.BLS_MONTHLY)
 async def get_bls_comprehensive(db: Session = Depends(get_data_db)):
-    """Get comprehensive BLS portal data"""
+    """Get comprehensive BLS portal data (cached for 24h)"""
+    print("[BLS_COMPREHENSIVE] Function called - DB queries starting...")  # Debug
 
     labor_indicators = []
 
@@ -766,8 +770,9 @@ async def get_bls_comprehensive(db: Session = Depends(get_data_db)):
 # ============================================================================
 
 @router.get("/treasury/comprehensive", response_model=TreasuryPortalData)
+@cached("portal:treasury:comprehensive", category=DataCategory.TREASURY_YIELDS)
 async def get_treasury_comprehensive(db: Session = Depends(get_data_db)):
-    """Get comprehensive Treasury portal data using ORM queries"""
+    """Get comprehensive Treasury portal data (cached for 4h)"""
 
     # --- YIELD CURVE ---
     yield_curve = []
@@ -952,12 +957,15 @@ async def get_treasury_comprehensive(db: Session = Depends(get_data_db)):
 # ============================================================================
 
 @router.get("/bls/snapshot")
+@cached("portal:bls:comprehensive", category=DataCategory.BLS_MONTHLY)
 async def get_bls_snapshot(db: Session = Depends(get_data_db)):
-    """Legacy endpoint - redirects to comprehensive"""
-    return await get_bls_comprehensive(db)
+    """Legacy endpoint - same cache as comprehensive"""
+    # Note: shares cache key with /bls/comprehensive
+    return await get_bls_comprehensive.__wrapped__(db)  # Call original function
 
 
 @router.get("/treasury/snapshot")
+@cached("portal:treasury:comprehensive", category=DataCategory.TREASURY_YIELDS)
 async def get_treasury_snapshot(db: Session = Depends(get_data_db)):
-    """Legacy endpoint - redirects to comprehensive"""
-    return await get_treasury_comprehensive(db)
+    """Legacy endpoint - same cache as comprehensive"""
+    return await get_treasury_comprehensive.__wrapped__(db)

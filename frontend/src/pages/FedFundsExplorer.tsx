@@ -77,19 +77,6 @@ interface TimelinePoint {
   effective: number | null;
 }
 
-interface TimelineData {
-  years_back: number;
-  data_points: number;
-  timeline: TimelinePoint[];
-}
-
-interface ChangesData {
-  years_back: number;
-  total_changes: number;
-  changes: RateChange[];
-  by_year: Record<string, { hikes: number; cuts: number; net_bps: number }>;
-}
-
 interface HistoricalTableData {
   years_back: number | string;
   frequency: string;
@@ -102,24 +89,6 @@ interface HistoricalTableData {
     target_midpoint: number | null;
     target_range: string | null;
     effective_rate: number | null;
-  }>;
-}
-
-interface CompareEffectiveData {
-  days_back: number;
-  data_points: number;
-  tracking_stats: {
-    avg_deviation_bps: number;
-    max_deviation_bps: number;
-    within_5bps_pct: number;
-  };
-  comparison: Array<{
-    date: string;
-    target_lower: number;
-    target_upper: number;
-    target_midpoint: number;
-    effective: number;
-    deviation_bps: number;
   }>;
 }
 
@@ -173,6 +142,38 @@ interface AboutData {
     latest_date: string | null;
   }>;
   related_concepts: string[];
+}
+
+// OPTIMIZED: Combined chart data from single endpoint
+interface ChartData {
+  years_back: number;
+  timeline: {
+    data_points: number;
+    total_points: number;
+    data: TimelinePoint[];
+  };
+  comparison: {
+    data_points: number;
+    total_points: number;
+    tracking_stats: {
+      avg_deviation_bps: number;
+      max_deviation_bps: number;
+      within_5bps_pct: number;
+    };
+    data: Array<{
+      date: string;
+      target_lower: number;
+      target_upper: number;
+      target_midpoint: number;
+      effective: number;
+      deviation_bps: number;
+    }>;
+  };
+  changes: {
+    total_changes: number;
+    data: RateChange[];
+    by_year: Record<string, { hikes: number; cuts: number; net_bps: number }>;
+  };
 }
 
 type ViewType = 'chart' | 'table';
@@ -436,7 +437,7 @@ function OverviewSection({ data }: { data: OverviewData }) {
 
           <div className="border-t pt-4">
             <div className="text-xs font-medium text-gray-500 mb-2">Recent Changes</div>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
+            <div className="space-y-2 max-h-64 overflow-y-auto">
               {recent_changes.slice(0, 6).map((change, idx) => (
                 <div key={idx} className="flex items-center justify-between text-sm py-1 border-b border-gray-100 last:border-0">
                   <div className="flex items-center gap-2">
@@ -469,16 +470,16 @@ function OverviewSection({ data }: { data: OverviewData }) {
 // SECTION 2: RATE HISTORY
 // ============================================================================
 
-function RateHistorySection() {
-  const [yearsBack, setYearsBack] = useState(5);
+interface RateHistorySectionProps {
+  timelineData: ChartData['timeline'] | undefined;
+  isLoading: boolean;
+  yearsBack: number;
+  onYearsBackChange: (value: number) => void;
+}
+
+function RateHistorySection({ timelineData, isLoading, yearsBack, onYearsBackChange }: RateHistorySectionProps) {
   const [view, setView] = useState<ViewType>('chart');
   const [frequency, setFrequency] = useState<'monthly' | 'daily'>('monthly');
-
-  const { data: timelineData, isLoading: timelineLoading } = useQuery({
-    queryKey: ['fedfunds-timeline', yearsBack],
-    queryFn: () => fedfundsResearchAPI.getTimeline<TimelineData>(yearsBack),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
 
   const { data: tableData, isLoading: tableLoading } = useQuery({
     queryKey: ['fedfunds-historical-table', yearsBack, frequency],
@@ -487,7 +488,7 @@ function RateHistorySection() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const isLoading = view === 'chart' ? timelineLoading : tableLoading;
+  const sectionLoading = view === 'chart' ? isLoading : tableLoading;
 
   return (
     <SectionCard
@@ -496,21 +497,21 @@ function RateHistorySection() {
       color="blue"
       rightContent={
         <div className="flex items-center gap-3">
-          <PeriodSelector value={yearsBack} onChange={setYearsBack} />
+          <PeriodSelector value={yearsBack} onChange={onYearsBackChange} />
           <ViewToggle value={view} onChange={setView} />
         </div>
       }
     >
-      {isLoading ? (
+      {sectionLoading ? (
         <LoadingSpinner />
-      ) : view === 'chart' && timelineData?.data ? (
+      ) : view === 'chart' && timelineData ? (
         <div>
           <div className="mb-2 text-sm text-gray-500">
-            {timelineData.data.data_points.toLocaleString()} data points
+            {timelineData.data_points.toLocaleString()} data points
           </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={timelineData.data.timeline} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <ComposedChart data={timelineData.data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                 <XAxis
                   dataKey="date"
@@ -604,7 +605,7 @@ function RateHistorySection() {
               </button>
             </div>
           </div>
-          <div className="overflow-x-auto max-h-96 border rounded-lg">
+          <div className="overflow-x-auto max-h-[32rem] border rounded-lg">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
@@ -647,21 +648,21 @@ function RateHistorySection() {
 // SECTION 3: FOMC RATE DECISIONS
 // ============================================================================
 
-function RateChangesSection() {
-  const [yearsBack, setYearsBack] = useState(5);
+interface RateChangesSectionProps {
+  changesData: ChartData['changes'] | undefined;
+  isLoading: boolean;
+  yearsBack: number;
+  onYearsBackChange: (value: number) => void;
+}
+
+function RateChangesSection({ changesData, isLoading, yearsBack, onYearsBackChange }: RateChangesSectionProps) {
   const [view, setView] = useState<ViewType>('table');
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['fedfunds-changes', yearsBack],
-    queryFn: () => fedfundsResearchAPI.getChanges<ChangesData>(yearsBack),
-    staleTime: 5 * 60 * 1000,
-  });
-
   if (isLoading) return <SectionCard title="FOMC Rate Decisions" icon={<Calendar className="w-5 h-5" />} color="amber"><LoadingSpinner /></SectionCard>;
-  if (error || !data?.data) return null;
+  if (!changesData) return null;
 
-  const changes = data.data.changes;
-  const byYear = data.data.by_year;
+  const changes = changesData.data;
+  const byYear = changesData.by_year;
 
   return (
     <SectionCard
@@ -670,7 +671,7 @@ function RateChangesSection() {
       color="amber"
       rightContent={
         <div className="flex items-center gap-3">
-          <PeriodSelector value={yearsBack} onChange={setYearsBack} />
+          <PeriodSelector value={yearsBack} onChange={onYearsBackChange} />
           <ViewToggle value={view} onChange={setView} />
         </div>
       }
@@ -716,7 +717,7 @@ function RateChangesSection() {
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="overflow-x-auto max-h-96 border rounded-lg">
+        <div className="overflow-x-auto max-h-[32rem] border rounded-lg">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 sticky top-0">
               <tr>
@@ -756,7 +757,7 @@ function RateChangesSection() {
       )}
 
       <div className="mt-3 text-sm text-gray-500">
-        Total: {data.data.total_changes} rate changes in the selected period
+        Total: {changesData.total_changes} rate changes in the selected period
       </div>
     </SectionCard>
   );
@@ -766,22 +767,20 @@ function RateChangesSection() {
 // SECTION 4: EFFECTIVE VS TARGET COMPARISON
 // ============================================================================
 
-function EffectiveVsTargetSection() {
-  const [yearsBack, setYearsBack] = useState(5);
+interface EffectiveVsTargetSectionProps {
+  comparisonData: ChartData['comparison'] | undefined;
+  isLoading: boolean;
+  yearsBack: number;
+  onYearsBackChange: (value: number) => void;
+}
+
+function EffectiveVsTargetSection({ comparisonData, isLoading, yearsBack, onYearsBackChange }: EffectiveVsTargetSectionProps) {
   const [view, setView] = useState<ViewType>('chart');
 
-  const daysBack = yearsBack === 0 ? 36500 : yearsBack * 365;
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['fedfunds-compare-effective', daysBack],
-    queryFn: () => fedfundsResearchAPI.compareEffective<CompareEffectiveData>(daysBack),
-    staleTime: 5 * 60 * 1000,
-  });
-
   if (isLoading) return <SectionCard title="Effective vs Target Comparison" icon={<ArrowRightLeft className="w-5 h-5" />} color="green"><LoadingSpinner /></SectionCard>;
-  if (error || !data?.data) return null;
+  if (!comparisonData) return null;
 
-  const { tracking_stats, comparison } = data.data;
+  const { tracking_stats, data: comparison } = comparisonData;
 
   return (
     <SectionCard
@@ -790,7 +789,7 @@ function EffectiveVsTargetSection() {
       color="green"
       rightContent={
         <div className="flex items-center gap-3">
-          <PeriodSelector value={yearsBack} onChange={setYearsBack} />
+          <PeriodSelector value={yearsBack} onChange={onYearsBackChange} />
           <ViewToggle value={view} onChange={setView} />
         </div>
       }
@@ -860,7 +859,7 @@ function EffectiveVsTargetSection() {
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="overflow-x-auto max-h-80 border rounded-lg">
+        <div className="overflow-x-auto max-h-[32rem] border rounded-lg">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 sticky top-0">
               <tr>
@@ -1044,13 +1043,23 @@ function AboutSection() {
 // ============================================================================
 
 export default function FedFundsExplorer() {
-  const { data: overviewData, isLoading, error } = useQuery({
+  // Shared years back state for all chart sections
+  const [yearsBack, setYearsBack] = useState(5);
+
+  const { data: overviewData, isLoading: overviewLoading, error: overviewError } = useQuery({
     queryKey: ['fedfunds-overview'],
     queryFn: () => fedfundsResearchAPI.getOverview<OverviewData>(),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  if (isLoading) {
+  // OPTIMIZED: Single combined endpoint for all chart data
+  const { data: chartData, isLoading: chartLoading } = useQuery({
+    queryKey: ['fedfunds-chart-data', yearsBack],
+    queryFn: () => fedfundsResearchAPI.getChartData<ChartData>(yearsBack),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  if (overviewLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
@@ -1058,7 +1067,7 @@ export default function FedFundsExplorer() {
     );
   }
 
-  if (error || !overviewData?.data) {
+  if (overviewError || !overviewData?.data) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-red-500">Failed to load Fed Funds data</div>
@@ -1080,9 +1089,24 @@ export default function FedFundsExplorer() {
         </div>
 
         <OverviewSection data={overviewData.data} />
-        <RateHistorySection />
-        <RateChangesSection />
-        <EffectiveVsTargetSection />
+        <RateHistorySection
+          timelineData={chartData?.data?.timeline}
+          isLoading={chartLoading}
+          yearsBack={yearsBack}
+          onYearsBackChange={setYearsBack}
+        />
+        <RateChangesSection
+          changesData={chartData?.data?.changes}
+          isLoading={chartLoading}
+          yearsBack={yearsBack}
+          onYearsBackChange={setYearsBack}
+        />
+        <EffectiveVsTargetSection
+          comparisonData={chartData?.data?.comparison}
+          isLoading={chartLoading}
+          yearsBack={yearsBack}
+          onYearsBackChange={setYearsBack}
+        />
         <AboutSection />
       </div>
     </div>

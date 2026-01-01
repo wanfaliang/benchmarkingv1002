@@ -16,6 +16,7 @@ from typing import Optional, List, Dict
 
 from ....database import get_data_db
 from ....api.auth import get_current_user
+from ....core.cache import cached, DataCategory
 from .jt_schemas import (
     JTDimensions, JTIndustryItem, JTStateItem, JTDataElementItem,
     JTSizeClassItem, JTRateLevelItem,
@@ -385,6 +386,7 @@ async def get_series_data(
 # =============================================================================
 
 @router.get("/overview", response_model=JTOverviewResponse)
+@cached("bls:jt:overview", category=DataCategory.BLS_MONTHLY, param_keys=["industry_code", "state_code"])
 async def get_overview(
     industry_code: str = Query("000000", description="Industry code (default: Total nonfarm)"),
     state_code: str = Query("00", description="State/region code (default: Total US)"),

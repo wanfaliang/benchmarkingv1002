@@ -488,6 +488,10 @@ export const fedfundsResearchAPI = {
 
   getAbout: <T = unknown>(): Promise<AxiosResponse<T>> =>
     api.get('/api/research/fred/fedfunds/about'),
+
+  // OPTIMIZED: Combined endpoint - fetches timeline, comparison, and changes in ONE request
+  getChartData: <T = unknown>(yearsBack: number = 5): Promise<AxiosResponse<T>> =>
+    api.get('/api/research/fred/fedfunds/chart-data', { params: { years_back: yearsBack } }),
 };
 
 // ============================================================================

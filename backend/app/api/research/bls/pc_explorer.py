@@ -10,6 +10,7 @@ from typing import Optional, List
 
 from ....database import get_data_db
 from ....api.auth import get_current_user
+from ....core.cache import cached, DataCategory
 from .pc_schemas import (
     PCDimensions, PCIndustryItem, PCProductItem,
     PCSeriesInfo, PCSeriesListResponse,
@@ -395,6 +396,7 @@ def get_series_data(
 # ==================== Overview ====================
 
 @router.get("/overview", response_model=PCOverviewResponse)
+@cached("bls:pc:overview", category=DataCategory.BLS_MONTHLY)
 def get_overview(
     db: Session = Depends(get_data_db),
     current_user=Depends(get_current_user)

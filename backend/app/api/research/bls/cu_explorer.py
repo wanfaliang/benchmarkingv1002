@@ -8,6 +8,7 @@ from sqlalchemy import and_, or_
 
 from ....database import get_data_db
 from ....api.auth import get_current_user
+from ....core.cache import cached, DataCategory
 from .cu_schemas import (
     CUDimensions, CUAreaItem, CUItemItem,
     CUSeriesListResponse, CUSeriesInfo,
@@ -281,6 +282,7 @@ def _calculate_inflation_metrics(series_id: str, item_name: str, db: Session) ->
 
 
 @router.get("/overview", response_model=CUOverviewResponse)
+@cached("bls:cu:overview", category=DataCategory.BLS_MONTHLY, param_keys=["area_code"])
 def get_cu_overview(
     area_code: str = Query("0000", description="Area code (default: US City Average)"),
     current_user=Depends(get_current_user),
