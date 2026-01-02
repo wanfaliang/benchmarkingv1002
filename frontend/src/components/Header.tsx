@@ -22,6 +22,7 @@ const Header: React.FC = () => {
   const navItems: NavItem[] = [
     { label: 'Financial Analysis', path: '/dashboard' },
     { label: 'Research', path: '/research' },
+    { label: 'Stocks', path: '/stocks' },
     { label: 'Datasets', path: '/datasets' },
     { label: 'Datahub', path: '/datahubs' },
     { label: 'Portfolio', path: '/portfolio' },

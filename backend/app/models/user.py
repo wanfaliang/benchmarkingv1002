@@ -36,3 +36,4 @@ class User(Base):
     datasets = relationship("Dataset", back_populates="owner", foreign_keys="Dataset.user_id")
     dashboards = relationship("Dashboard", back_populates="user")
     saved_queries = relationship("SavedQuery", back_populates="user")
+    saved_screens = relationship("SavedScreen", back_populates="user", cascade="all, delete-orphan")

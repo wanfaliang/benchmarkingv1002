@@ -6,7 +6,7 @@ File: backend/app/models/dataset.py
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, JSON, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from backend.app.database import Base
+from ..database import Base
 import uuid
 
 

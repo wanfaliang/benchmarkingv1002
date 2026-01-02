@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import secrets
 from .api import auth, tickers, analyses, websocket, datasets
+from .api.stocks import router as stocks_router
 from .api.research import treasury as treasury_research
 from .api.research import fred_explorer as fred_research
 from .api.research import fred_claims_explorer as fred_claims_research
@@ -90,6 +91,9 @@ app.include_router(tickers.router)
 app.include_router(analyses.router)
 app.include_router(websocket.router)
 app.include_router(datasets.router)
+
+# Stocks module (Stock Screener)
+app.include_router(stocks_router)
 
 # Research module routers (DATA database)
 app.include_router(treasury_research.router)

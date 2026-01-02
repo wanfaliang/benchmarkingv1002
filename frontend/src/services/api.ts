@@ -3200,6 +3200,283 @@ export const beaResearchAPI = {
 };
 
 // ============================================================================
+// Stocks Module - Stock Screener API
+// ============================================================================
+
+export interface ScreenFilter {
+  feature: string;
+  operator: string;  // "<", ">", "=", "!=", ">=", "<=", "in", "between", etc.
+  value: number | string | number[] | string[];
+}
+
+export interface UniverseFilter {
+  min_market_cap?: number;
+  max_market_cap?: number;
+  sectors?: string[];
+  industries?: string[];
+  exchanges?: string[];
+  countries?: string[];
+  exclude_etfs?: boolean;
+  exclude_adrs?: boolean;
+  min_price?: number;
+  min_volume?: number;
+}
+
+export interface ScreenRequest {
+  universe?: UniverseFilter;
+  filters?: ScreenFilter[];
+  columns?: string[];
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+
+export interface StockResult {
+  symbol: string;
+  company_name?: string;
+  sector?: string;
+  industry?: string;
+  country?: string;
+  price?: number;
+  price_change?: number;
+  price_change_pct?: number;
+  market_cap?: number;
+  volume?: number;
+  avg_volume?: number;
+  exchange?: string;
+  beta?: number;
+  pe_ratio_ttm?: number;
+  pb_ratio?: number;
+  ev_to_ebitda?: number;
+  earnings_yield?: number;
+  fcf_yield?: number;
+  roe?: number;
+  roic?: number;
+  gross_margin?: number;
+  net_profit_margin?: number;
+  debt_to_equity?: number;
+  current_ratio?: number;
+  dividend_yield?: number;
+  peg_ratio?: number;
+  payout_ratio?: number;
+  data?: Record<string, unknown>;
+}
+
+export interface ScreenResponse {
+  total_count: number;
+  returned_count: number;
+  offset: number;
+  limit: number;
+  results: StockResult[];
+  execution_time_ms: number;
+}
+
+// Computed features types
+export interface Week52Stats {
+  symbol: string;
+  high_52w?: number;
+  low_52w?: number;
+  pct_from_high?: number;
+  pct_from_low?: number;
+}
+
+export interface ReturnsData {
+  symbol: string;
+  return_1d?: number;
+  return_1w?: number;
+  return_1m?: number;
+  return_3m?: number;
+  return_6m?: number;
+  return_ytd?: number;
+  return_1y?: number;
+}
+
+export interface ComputedFeatures extends Week52Stats, Omit<ReturnsData, 'symbol'> {
+  symbol: string;
+}
+
+export interface ComputedFeaturesBatchResponse {
+  data: Record<string, ComputedFeatures>;
+  symbols_requested: number;
+  symbols_found: number;
+}
+
+export interface ScreenTemplate {
+  template_key: string;
+  name: string;
+  description: string;
+  category: string;
+  filters: ScreenFilter[];
+  universe?: UniverseFilter;
+  default_columns: string[];
+  sort_by: string;
+  sort_order: 'asc' | 'desc';
+}
+
+export interface TemplateCategory {
+  category: string;
+  count: number;
+  templates: string[];
+}
+
+export interface SavedScreenSummary {
+  screen_id: string;
+  name: string;
+  description?: string;
+  filter_count: number;
+  is_template: boolean;
+  template_key?: string;
+  last_run_at?: string;
+  run_count: number;
+  last_result_count?: number;
+}
+
+export interface SavedScreenResponse {
+  screen_id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  filters: ScreenFilter[];
+  universe?: UniverseFilter;
+  columns?: string[];
+  sort_by?: string;
+  sort_order: string;
+  is_template: boolean;
+  template_key?: string;
+  last_run_at?: string;
+  run_count: number;
+  last_result_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedScreenCreate {
+  name: string;
+  description?: string;
+  filters?: ScreenFilter[];
+  universe?: UniverseFilter;
+  columns?: string[];
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+}
+
+export const stocksAPI = {
+  // Universe endpoints (public)
+  getUniverseStats: (): Promise<AxiosResponse> =>
+    api.get('/api/stocks/universe/stats'),
+
+  getSectors: (): Promise<AxiosResponse<{ sectors: Array<{ name: string; count: number }> }>> =>
+    api.get('/api/stocks/universe/sectors'),
+
+  getIndustries: (sector?: string): Promise<AxiosResponse> =>
+    api.get('/api/stocks/universe/industries', { params: sector ? { sector } : {} }),
+
+  // Screen endpoint (requires auth)
+  runScreen: (
+    request: ScreenRequest,
+    includeCount: boolean = false
+  ): Promise<AxiosResponse<ScreenResponse>> =>
+    api.post('/api/stocks/screen', request, {
+      params: { include_count: includeCount },
+    }),
+
+  // Saved screens (requires auth)
+  listSavedScreens: (): Promise<AxiosResponse<SavedScreenSummary[]>> =>
+    api.get('/api/stocks/screens/'),
+
+  createSavedScreen: (data: SavedScreenCreate): Promise<AxiosResponse<SavedScreenResponse>> =>
+    api.post('/api/stocks/screens/', data),
+
+  getSavedScreen: (screenId: string): Promise<AxiosResponse<SavedScreenResponse>> =>
+    api.get(`/api/stocks/screens/${screenId}`),
+
+  updateSavedScreen: (screenId: string, data: Partial<SavedScreenCreate>): Promise<AxiosResponse<SavedScreenResponse>> =>
+    api.put(`/api/stocks/screens/${screenId}`, data),
+
+  deleteSavedScreen: (screenId: string): Promise<AxiosResponse<void>> =>
+    api.delete(`/api/stocks/screens/${screenId}`),
+
+  duplicateSavedScreen: (screenId: string, newName?: string): Promise<AxiosResponse<SavedScreenResponse>> =>
+    api.post(`/api/stocks/screens/${screenId}/duplicate`, null, {
+      params: newName ? { new_name: newName } : {},
+    }),
+
+  logScreenRun: (
+    screenId: string,
+    resultCount: number,
+    executionTimeMs?: number
+  ): Promise<AxiosResponse<{ success: boolean; run_count: number }>> =>
+    api.post(`/api/stocks/screens/${screenId}/log-run`, null, {
+      params: {
+        result_count: resultCount,
+        ...(executionTimeMs && { execution_time_ms: executionTimeMs }),
+      },
+    }),
+
+  runSavedScreen: (
+    screenId: string,
+    limit: number = 100,
+    offset: number = 0
+  ): Promise<AxiosResponse<ScreenResponse>> =>
+    api.post(`/api/stocks/screens/${screenId}/run`, null, {
+      params: { limit, offset },
+    }),
+
+  // Templates (public)
+  listTemplates: (category?: string): Promise<AxiosResponse<ScreenTemplate[]>> =>
+    api.get('/api/stocks/templates/', { params: category ? { category } : {} }),
+
+  getTemplateCategories: (): Promise<AxiosResponse<{
+    total_templates: number;
+    categories: TemplateCategory[];
+  }>> =>
+    api.get('/api/stocks/templates/categories'),
+
+  getTemplate: (templateKey: string): Promise<AxiosResponse<ScreenTemplate>> =>
+    api.get(`/api/stocks/templates/${templateKey}`),
+
+  runTemplate: (
+    templateKey: string,
+    limit: number = 100,
+    offset: number = 0,
+    includeCount: boolean = false,
+    sortBy?: string,
+    sortOrder?: 'asc' | 'desc'
+  ): Promise<AxiosResponse<ScreenResponse>> =>
+    api.post(`/api/stocks/templates/${templateKey}/run`, null, {
+      params: {
+        limit,
+        offset,
+        include_count: includeCount,
+        ...(sortBy && { sort_by: sortBy }),
+        ...(sortOrder && { sort_order: sortOrder }),
+      },
+    }),
+
+  // Computed features
+  getComputedFeatures: (symbol: string): Promise<AxiosResponse<ComputedFeatures>> =>
+    api.get(`/api/stocks/computed/${symbol}`),
+
+  getComputedFeaturesBatch: (
+    symbols: string[],
+    include52w: boolean = true,
+    includeReturns: boolean = true
+  ): Promise<AxiosResponse<ComputedFeaturesBatchResponse>> =>
+    api.post('/api/stocks/computed/batch', {
+      symbols,
+      include_52w: include52w,
+      include_returns: includeReturns,
+    }),
+
+  get52WeekStats: (symbol: string): Promise<AxiosResponse<Week52Stats>> =>
+    api.get(`/api/stocks/computed/${symbol}/52week`),
+
+  getReturns: (symbol: string): Promise<AxiosResponse<ReturnsData>> =>
+    api.get(`/api/stocks/computed/${symbol}/returns`),
+};
+
+// ============================================================================
 // Error formatting utility
 // ============================================================================
 

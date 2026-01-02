@@ -66,6 +66,10 @@ import GDPbyIndustryExplorer from './pages/GDPbyIndustryExplorer';
 import ITAExplorer from './pages/ITAExplorer';
 import FixedAssetsExplorer from './pages/FixedAssetsExplorer';
 
+// Stocks Module
+import StocksPortal from './pages/stocks/StocksPortal';
+import Screener from './pages/stocks/Screener';
+
 // Create a client for react-query
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -207,6 +211,10 @@ function App(): React.ReactElement {
               <Route path="bd" element={<BDExplorer />} />
               <Route path="ei" element={<EIExplorer />} />
             </Route>
+
+            {/* Stocks Module */}
+            <Route path="/stocks" element={<ProtectedRoute><StocksPortal /></ProtectedRoute>} />
+            <Route path="/stocks/screener" element={<ProtectedRoute><Screener /></ProtectedRoute>} />
 
             {/* Catch all - redirect to home */}
             <Route path="*" element={<Navigate to="/" />} />
